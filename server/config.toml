@@ -1,0 +1,37 @@
+sun_angle = 48.0
+tracks = ["acu_bathurst"]
+cars=["ks_alfa_romeo_155_v6", "bmw_m3_e30_dtm", "bmw_m3_e30_gra", "ks_mercedes_190_evo2"]
+
+[server]
+address = "0.0.0.0"
+tcp_port = 9800
+udp_port = 9800
+http_port = 8080
+max_clients = 10
+client_send_interval_hz = 20
+
+[game]
+legal_tyres = "idk"
+force_virtual_mirror = false
+tc_allowed =  0
+abs_allowed =  0
+stability_allowed = false
+autoclutch_allowed = false
+tyre_blankets_allowed = true
+
+[[weathers]]
+  graphics = "3_clear"
+  base_ambient=21
+  base_road=30
+  variation_ambient=1
+  variation_road=1
+  [weathers.wind]
+  base_speed_min=1
+  base_speed_max=4
+  base_direction=3
+  variation_direction=20
+
+[log]
+level = "debug"
+
+
