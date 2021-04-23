@@ -1,30 +1,5 @@
 use super::*;
-//use crate::{Readable, Writeable};
-/*#[derive(Debug, Clone)]
-pub struct Unknown {
-    unknown: u8,
-    unknown2: u16,
-    unknown3: u16,
-}
-
-impl Readable for Unknown {
-    fn read(buffer: &mut std::io::Cursor<&[u8]>) -> Result<Self, anyhow::Error> {
-        Ok(Self {
-            unknown: u8::read(buffer)?,
-            unknown2: u16::read(buffer)?,
-            unknown3: u16::read(buffer)?,
-        })
-    }
-}
-impl Writeable for Unknown {
-    fn write(&self, output: &mut Vec<u8>) -> Result<(), anyhow::Error> {
-        self.unknown.write(output)?;
-        self.unknown2.write(output)?;
-        self.unknown3.write(output)?;
-
-        Ok(())
-    }
-}*/
+use crate::packets::common::Vec3f;
 
 def_enum! {
     CollisionType (u8) {
@@ -76,11 +51,6 @@ packets! {
         driver_nation String;
         is_spectator bool;
         unknown f32;
-    }
-    Vec3f{
-        x f32;
-        y f32;
-        z f32;
     }
 }
 
@@ -276,7 +246,7 @@ packets! {
         event_type u8;
         session_id u8;
 
-        other_car u8;//optional
+        other_car Option<u8>;//optional
 
         impact_speed u8;
         world_pos Vec3f;
@@ -331,8 +301,8 @@ packets! {
     EndSessionPlugin{
 
     }
-
 }
+
 packet_enum!(UdpPlugin{
     0x32 = SessionInfoPlugin,
     0x3b = SessionInfoPlugin1,

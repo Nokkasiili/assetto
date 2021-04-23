@@ -7,6 +7,12 @@ use std::iter;
 use std::marker::PhantomData;
 use thiserror::Error;
 
+#[derive(Debug)]
+pub enum Optional<T> {
+    None,
+    Some(T),
+}
+
 /// Trait implemented for types which can be read
 /// from a buffer.
 pub trait Readable {

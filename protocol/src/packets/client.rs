@@ -1,4 +1,5 @@
 use super::*;
+use crate::packets::common::Vec3f;
 
 packets! {
     MD5{
@@ -48,10 +49,9 @@ packets! {
     CarUpdate{
         unknown u8;
         timestamp u32;
-        /* pos vec3f;
-         * rotation vec3f;
-         * velocity vec3f;
-         */
+        pos Vec3f;
+        rotation Vec3f;
+        velocity Vec3f;
         tyre_angular_speed u8;
         tyre_angular_speed1 u8;
         tyre_angular_speed2 u8;
