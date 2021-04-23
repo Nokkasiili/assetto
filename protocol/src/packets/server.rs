@@ -27,10 +27,16 @@ impl Writeable for Unknown {
 }*/
 
 def_enum! {
+    CollisionType (u8) {
+        10 = CarCollision,
+        11 = WorldCollision,
+    }
+}
+def_enum! {
     OnOffFactoryOption (i8) {
-        0 = Off,
+        0 = Denied,
         1 = Factory,
-        2 = On,
+        2 = Forced,
     }
 }
 def_enum! {
@@ -43,7 +49,7 @@ def_enum! {
 }
 
 packets! {
-    Session{
+    SessionU{
         unknown u8;
         unknown2 u16;
         time u16;
@@ -60,6 +66,21 @@ packets! {
     DRSZone{
         unknown f32;
         unknown2 f32;
+    }
+    Car{
+        session_id u8;
+        car_model String;
+        car_skin String;
+        driver_name String;
+        driver_team String;
+        driver_nation String;
+        is_spectator bool;
+        unknown f32;
+    }
+    Vec3f{
+        x f32;
+        y f32;
+        z f32;
     }
 }
 
@@ -96,7 +117,7 @@ packets! {
         inverted_grid_positions i16;
         session_id u8;
 
-        sessions BytePrefixedVec<Session>;
+        sessions BytePrefixedVec<SessionU>;
 
         session_name String;
         session_index u8;
@@ -198,7 +219,7 @@ packets! {
         session_id u8;
     }
     RaceStart{
-        unknown i16; //time
+        unknown i16; //timestatus
         unknown2 u16; // time
         unknown3 u32; // time
         ping u16;
@@ -207,7 +228,13 @@ packets! {
         //missing
     }
     DamageUpdate {
-        //Missing
+        session_id u8;
+        damage f32; //engine?
+        damage1 f32; //gear
+        damage2 f32; //f sus
+        damage3 f32; //steering
+        damage4 f32; //r sus
+        damage5 f32; //chasis
     }
     DRSZones{
         zones BytePrefixedVec<DRSZone>;
@@ -218,7 +245,104 @@ packets! {
         unknown3 u32;
         unknown4 u8;
     }
+    Session {
+        session_name String;
+        session_index u8;
+        session_type u8;
+        session_time u16;
+        session_laps u16;
+        grip_level f32;
+        time u64;
+    }
+    CarList{
+        unknown u8;
+        cars BytePrefixedVec<Car>;
+    }
 }
+
+packets! {
+    NewCarConnectionPlugin{
+        name WideString;
+        guid WideString;
+        session_id u8;
+        car_model String;
+        car_skin String;
+    }
+
+    SendVersionPlugin{
+        version u8; //4
+    }
+    ClientEventPlugin {
+        event_type u8;
+        session_id u8;
+
+        other_car u8;//optional
+
+        impact_speed u8;
+        world_pos Vec3f;
+        real_pos Vec3f;
+    }
+
+    SessionInfoPlugin{
+        protocol_version u8;
+        session_index u8;
+        sessions_len u8;
+        server_name WideString;
+        track String;
+        track_config String;
+        name String;
+        typ u8;
+        time u16;
+        laps u16;
+        wait_time u16;
+        ambient_temp u8;
+        road_temp u8;
+        weather_graphics String;
+        elapsed_ms i32;
+    }
+    SessionInfoPlugin1{
+        protocol_version u8;
+        session_index u8;
+        sessions_len u8;
+        server_name WideString;
+        track String;
+        track_config String;
+        name String;
+        typ u8;
+        time u16;
+        laps u16;
+        wait_time u16;
+        ambient_temp u8;
+        road_temp u8;
+        weather_graphics String;
+        elapsed_ms i32;
+    }
+    ChatPlugin{
+        session_id u8;
+        msg WideString;
+    }
+    SessionClosedPlugin{
+        name WideString;
+        guid WideString;
+        session_id u8;
+        car_model String;
+        car_skin String;
+    }
+    EndSessionPlugin{
+
+    }
+
+}
+packet_enum!(UdpPlugin{
+    0x32 = SessionInfoPlugin,
+    0x3b = SessionInfoPlugin1,
+    0x33 = NewCarConnectionPlugin,
+    0x34 = SessionClosedPlugin,
+    0x37 = EndSessionPlugin,
+    0x38 = SendVersionPlugin,
+    0x39 = ChatPlugin,
+    0x82 = ClientEventPlugin,
+});
 
 packet_enum!(TestServer {
     0xe = MandatoryPit,
@@ -227,8 +351,10 @@ packet_enum!(TestServer {
     0x3e = NewCarConnection,
     0x3b = Banned,
     0x3c = WrongPassword,
+    0x4a = Session,
     0x4d = ClientDisconnect,
     0x4b = RaceOver,
+    0x40 = CarList,
     0x42 = WrongProtocol,
     0x45 = NoSlotsForCarModel,
     0x47 = Chat,

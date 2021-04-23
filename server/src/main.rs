@@ -1,7 +1,8 @@
+pub mod client;
 pub mod config;
 pub mod option;
-use config::Config;
 use anyhow::Context;
+use config::Config;
 
 const CONFIG_PATH: &str = "config.toml";
 fn main() -> anyhow::Result<()> {
