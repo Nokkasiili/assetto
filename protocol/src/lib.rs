@@ -1,10 +1,9 @@
-use anyhow::anyhow;
 pub mod codec;
 pub mod io;
+pub mod json;
 pub mod packets;
 pub use codec::Codec;
-use io::{Readable, WideString, Writeable};
-use packets::{client, server};
+use io::{Readable, Writeable};
 use packets::{client::*, server::*};
 
 const PROTOCOL_VERSION: usize = 202;
