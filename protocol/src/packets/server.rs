@@ -334,6 +334,30 @@ packets! {
         unknown u8;
         ping_cache u8;
     }
+    NextSessionVote{
+        useless u8;
+        unknown u8;
+        unknown1 u8;
+        dead_line u32;
+        last_voter u8;
+        last_vote bool;
+    }
+    KickVote{
+        session_id u8;
+        unknown u8;
+        unknown1 u8;
+        dead_line u32;
+        last_voter u8;
+        last_vote bool;
+    }
+    RestartSessionVote{
+        useless u8;
+        unknown u8;
+        unknown1 u8;
+        dead_line u32;
+        last_voter u8;
+        last_vote bool;
+    }
 }
 
 packet_enum!(UdpPlugin{
@@ -374,6 +398,9 @@ packet_enum!(TestServer {
     0x56 = DamageUpdate,
     0x57 = RaceStart,
     0x58 = SectorSplit,
+    0x64 = NextSessionVote,
+    0x65 = RestartSessionVote,
+    0x66 = KickVote,
     0x68 = Kick,
     0x6f = Unknown,
     0x6e = SessionClosed,

@@ -50,15 +50,15 @@ packets! {
         unknown2 u32;
         unknown3 u8;
     }
-    Vote1{
+    NextSessionVote{
         unknown u8;
     }
-    Vote2{
+    RestartSessionVote{
         unknown u8;
     }
 
-    Vote3{
-        unknown u8;
+    KickVote{
+        session_id u8;
         unknown2 u8;
     }
     CarUpdate{
@@ -179,8 +179,8 @@ packet_enum!(TestClient {
     0x50 = ChangeTireCompound,
     0x56 = DamageUpdate,
     0x58 = SectorSplit,
-    0x64 = Vote1,
-    0x65 = Vote2,
-    0x66 = Vote3,
+    0x64 = NextSessionVote,
+    0x65 = RestartSessionVote,
+    0x66 = KickVote,
     0x82 = Event,
 });
