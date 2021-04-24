@@ -2,7 +2,7 @@ use anyhow::{bail, Context};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::borrow::Cow;
 use std::convert::{TryFrom, TryInto};
-use std::io::{self, Cursor, Read, Write};
+use std::io::{Cursor, Read};
 use std::iter;
 use std::marker::PhantomData;
 use thiserror::Error;

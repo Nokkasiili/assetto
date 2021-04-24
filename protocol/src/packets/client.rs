@@ -1,9 +1,24 @@
+use byteorder::ReadBytesExt;
+
 use super::*;
-use crate::packets::common::Vec3f;
+use crate::{io::Readable, io::Writeable, packets::common::Vec3f};
 
 packets! {
     MD5{
 
+    }
+}
+packets! {
+    AdminCommandPlugin{
+        cmd WideString;
+    }
+    NextSessionPlugin{}
+    RestartSessionPlugin{}
+    SessionInfoPlugin{
+        session_infos BytePrefixedVec<SessionInfoU>;
+    }
+    KickPlugin{
+        session_id u8;
     }
 }
 packets! {
@@ -84,7 +99,53 @@ packets! {
         damage4 f32; //r sus
         damage5 f32; //chasis
     }
+    Unknown1 {
+        unknown u16;
+        unknown2 u8;
+    }
 
+}
+#[derive(Debug, Clone)]
+pub struct Event {
+    event_type: u16,
+    other_car: Option<u8>,
+    impact_speed: f32,
+    world_pos: Vec3f,
+    real_pos: Vec3f,
+}
+impl Writeable for Event {
+    fn write(&self, buffer: &mut Vec<u8>) -> anyhow::Result<()> {
+        self.event_type.write(buffer)?;
+        if let Some(other_car) = self.other_car {
+            other_car.write(buffer)?;
+        }
+        self.impact_speed.write(buffer)?;
+        self.world_pos.write(buffer)?;
+        self.real_pos.write(buffer)?;
+        Ok(())
+    }
+}
+impl Readable for Event {
+    fn read(buffer: &mut std::io::Cursor<&[u8]>) -> anyhow::Result<Self> {
+        let event_type = u16::read(buffer)?;
+        let has_other_car = bool::read(buffer)?;
+        let other_car = {
+            match has_other_car {
+                true => Some(u8::read(buffer)?),
+                false => None,
+            }
+        };
+        let impact_speed = f32::read(buffer)?;
+        let world_pos = Vec3f::read(buffer)?;
+        let real_pos = Vec3f::read(buffer)?;
+        Ok(Self {
+            event_type,
+            other_car,
+            impact_speed,
+            world_pos,
+            real_pos,
+        })
+    }
 }
 
 packets! {
@@ -94,20 +155,6 @@ packets! {
         unknown3 u32;
         unknown4 u32;
         unknown5 u32;
-    }
-}
-
-packets! {
-    AdminCommandPlugin{
-        cmd WideString;
-    }
-    NextSessionPlugin{}
-    RestartSessionPlugin{}
-    SessionInfoPlugin{
-        session_infos BytePrefixedVec<SessionInfoU>;
-    }
-    KickPlugin{
-        session_id u8;
     }
 }
 
@@ -121,6 +168,7 @@ packet_enum!(UdpPlugin {
 });
 packet_enum!(TestClient {
     0xe = Unknown,
+    0xd = Unknown1,
     0xf9 = Ping,
     0x3d = JoinRequest,
     0x3f = CarlistRequest,
@@ -134,5 +182,5 @@ packet_enum!(TestClient {
     0x64 = Vote1,
     0x65 = Vote2,
     0x66 = Vote3,
-  //  0x82 = Event,
+    0x82 = Event,
 });

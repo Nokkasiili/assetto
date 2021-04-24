@@ -43,14 +43,22 @@ packets! {
         unknown2 f32;
     }
     Car{
-        session_id u8;
+        index u8;
         car_model String;
         car_skin String;
         driver_name String;
         driver_team String;
         driver_nation String;
         is_spectator bool;
-        unknown f32;
+        damage f32;
+        damage1 f32;
+        damage2 f32;
+        damage3 f32;
+        damage4 f32;
+    }
+    Name{
+        session_id u8;
+        name WideString;
     }
 }
 
@@ -248,7 +256,7 @@ packets! {
 
         other_car Option<u8>;//optional
 
-        impact_speed u8;
+        impact_speed f32;
         world_pos Vec3f;
         real_pos Vec3f;
     }
@@ -301,6 +309,31 @@ packets! {
     EndSessionPlugin{
 
     }
+    Names{
+        driver_names  BytePrefixedVec<Name>;
+    }
+    Unknown1{
+        session_id u8;
+        p2p_count i16;
+        unknown u8;
+    }
+    WelcomeMessage{
+        unknown u8;
+        welcome_msg WideString;// wrong
+    }
+
+    Unknown2{
+        session_id u8;
+        unknown String;
+        unknown2 String;
+    }
+    SessionTimeLeft{
+        session_time_left u32;
+    }
+    PingCache{
+        unknown u8;
+        ping_cache u8;
+    }
 }
 
 packet_enum!(UdpPlugin{
@@ -316,6 +349,7 @@ packet_enum!(UdpPlugin{
 
 packet_enum!(TestServer {
     0xe = MandatoryPit,
+    0xd = Unknown1,
     0xf9 = Ping,
     0x4a = UpdateSession,
     0x3e = NewCarConnection,
@@ -324,12 +358,16 @@ packet_enum!(TestServer {
     0x4a = Session,
     0x4d = ClientDisconnect,
     0x4b = RaceOver,
+    0x5a = Unknown2,
+    0x5b = Names,
     0x40 = CarList,
+    0x41 = SessionTimeLeft,
     0x42 = WrongProtocol,
     0x45 = NoSlotsForCarModel,
     0x47 = Chat,
     0x49 = LapCompeleted,
     0x50 = ChangeTireCompound,
+    0x51 = WelcomeMessage,
     0x52 = CarSetup,
     0x53 = DRSZones,
     0x54 = SunAngle,
@@ -341,4 +379,5 @@ packet_enum!(TestServer {
     0x6e = SessionClosed,
     0x70 = Bops,
     0x78 = Weather,
+    0x8c = PingCache,
 });

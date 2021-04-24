@@ -1,4 +1,3 @@
-use super::*;
 packets!(
     Vec3f{
         x f32;
@@ -6,8 +5,3 @@ packets!(
         z f32;
     }
 );
-#[derive(Debug)]
-pub enum Optional<T> {
-    None,
-    Some(T),
-}
