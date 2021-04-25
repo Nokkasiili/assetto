@@ -202,6 +202,26 @@ impl Writeable for bool {
         Ok(())
     }
 }
+#[derive(Debug, Clone)]
+pub struct MD5Array(pub Vec<u8>);
+impl Readable for MD5Array {
+    fn read(buffer: &mut std::io::Cursor<&[u8]>) -> Result<Self, anyhow::Error> {
+        let length: usize = u8::read(buffer)
+            .context("failed to read md5 length")?
+            .into();
+
+        let mut vec = vec![0u8; length];
+        buffer.read_exact(&mut vec)?;
+        Ok(MD5Array(vec))
+    }
+}
+impl Writeable for MD5Array {
+    fn write(&self, buffer: &mut Vec<u8>) -> Result<(), anyhow::Error> {
+        (self.0.len() as u8).write(buffer)?;
+        buffer.extend_from_slice(&self.0);
+        Ok(())
+    }
+}
 
 pub struct WideString(pub String);
 impl Readable for WideString {

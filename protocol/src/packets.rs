@@ -108,7 +108,7 @@ macro_rules! packet_enum {
                     $(
                         id if id == $id => Ok($ident::$packet($packet::read(buffer)?)),
                     )*
-                    _ => Err(anyhow::anyhow!("unknown packet ID {}", packet_id)),
+                    _ => Err(anyhow::anyhow!("unknown packet ID {:#x}", packet_id)),
                 }
             }
         }
@@ -266,6 +266,7 @@ pub trait VariantOf<Enum> {
         Self: Sized;
 }
 use crate::io::BytePrefixedVec;
+use crate::io::MD5Array;
 use crate::io::WideString;
 pub mod client;
 pub mod common;

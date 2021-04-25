@@ -23,6 +23,15 @@ def_enum! {
     }
 }
 
+def_enum! {
+    SessionType (i8) {
+        0 = Booking,
+        1 = Practice,
+        2 = Qualify,
+        3 = Race,
+    }
+}
+
 packets! {
     SessionU{
         unknown u8;
@@ -73,8 +82,8 @@ packets! {
         car_skin String;
         unknown2 f32;
         allowed_tyres i16;
-        tyre_blankets_allowed bool;
 
+        tyre_blankets_allowed bool;
         tc_allowed OnOffFactoryOption;
         abs_allowed OnOffFactoryOption;
         stability_allowed bool;
@@ -82,24 +91,23 @@ packets! {
         start_rule u8;
         damage_multiplier f32;
         fuel_rate f32;
-        unknown3 f32;
-
+        tyre_wear_rate f32;
         force_mirror bool;
+
         max_contacts_per_km u8;
         race_over_time u32;
-        result_scren_time u32;
+        result_screen_time u32;
         has_extra_lap bool;
         race_gas_penalty_disabled bool;
         pit_window_start u16;
         pit_window_end u16;
         inverted_grid_positions i16;
+
         session_id u8;
-
         sessions BytePrefixedVec<SessionU>;
-
         session_name String;
         session_index u8;
-        session_type u8;
+        session_type SessionType;
         session_time u16;
         session_laps u16;
         grip_level f32;
@@ -107,7 +115,8 @@ packets! {
         player_position u8;
 
         time i64;
-        checksum_files BytePrefixedVec<String>;
+        checksum_files BytePrefixedVec<MD5Array>;
+        legal_tyres String;
 
         random_seed u32;
         unknown4 u32;
@@ -139,8 +148,6 @@ packets! {
         laps u16;
         completed bool;
         grip_level f32;
-//"%d) %s BEST: %s TOTAL: %s Laps:%d SesID:%d HasFinished:%
-
     }
     MandatoryPit{
         session_id u8;
@@ -169,8 +176,8 @@ packets! {
 
     UpdateSession {
         session_name String;
-        session_id u8;
-        session_type u8;
+        session_index u8;
+        session_type SessionType;
         session_time u16;
         session_laps u16;
         grip_level f32;
@@ -226,15 +233,70 @@ packets! {
     Session {
         session_name String;
         session_index u8;
-        session_type u8;
+        session_type SessionType;
         session_time u16;
         session_laps u16;
         grip_level f32;
         time u64;
     }
     CarList{
-        unknown u8;
+        from_session_id u8;
         cars BytePrefixedVec<Car>;
+    }
+    EndSessionPlugin{
+
+    }
+    Names{
+        driver_names  BytePrefixedVec<Name>;
+    }
+    P2PCount{
+        session_id u8;
+        p2p_count i16;
+        unknown u8;
+    }
+    WelcomeMessage{
+        unknown u8;
+        welcome_msg WideString;// wrong
+    }
+
+    Unknown2{
+        session_id u8;
+        unknown String;
+        unknown2 String;
+    }
+    SessionTimeLeft{
+        session_time_left u32;
+    }
+    PingCache{
+        unknown u8;
+        ping_cache u8;
+    }
+    NextSessionVote{
+        useless u8;
+        unknown u8;
+        unknown1 u8;
+        dead_line u32;
+        last_voter u8;
+        last_vote bool;
+    }
+    KickVote{
+        session_id u8;
+        unknown u8;
+        unknown1 u8;
+        dead_line u32;
+        last_voter u8;
+        last_vote bool;
+    }
+    RestartSessionVote{
+        useless u8;
+        unknown u8;
+        unknown1 u8;
+        dead_line u32;
+        last_voter u8;
+        last_vote bool;
+    }
+    Unknown3{
+        unknown WideString;
     }
 }
 
@@ -306,58 +368,6 @@ packets! {
         car_model String;
         car_skin String;
     }
-    EndSessionPlugin{
-
-    }
-    Names{
-        driver_names  BytePrefixedVec<Name>;
-    }
-    Unknown1{
-        session_id u8;
-        p2p_count i16;
-        unknown u8;
-    }
-    WelcomeMessage{
-        unknown u8;
-        welcome_msg WideString;// wrong
-    }
-
-    Unknown2{
-        session_id u8;
-        unknown String;
-        unknown2 String;
-    }
-    SessionTimeLeft{
-        session_time_left u32;
-    }
-    PingCache{
-        unknown u8;
-        ping_cache u8;
-    }
-    NextSessionVote{
-        useless u8;
-        unknown u8;
-        unknown1 u8;
-        dead_line u32;
-        last_voter u8;
-        last_vote bool;
-    }
-    KickVote{
-        session_id u8;
-        unknown u8;
-        unknown1 u8;
-        dead_line u32;
-        last_voter u8;
-        last_vote bool;
-    }
-    RestartSessionVote{
-        useless u8;
-        unknown u8;
-        unknown1 u8;
-        dead_line u32;
-        last_voter u8;
-        last_vote bool;
-    }
 }
 
 packet_enum!(UdpPlugin{
@@ -371,9 +381,13 @@ packet_enum!(UdpPlugin{
     0x82 = ClientEventPlugin,
 });
 
+packet_enum!(HandShake{
+    0x3e = NewCarConnection,
+});
+
 packet_enum!(TestServer {
     0xe = MandatoryPit,
-    0xd = Unknown1,
+    0x0d = P2PCount,
     0xf9 = Ping,
     0x4a = UpdateSession,
     0x3e = NewCarConnection,
@@ -384,6 +398,7 @@ packet_enum!(TestServer {
     0x4b = RaceOver,
     0x5a = Unknown2,
     0x5b = Names,
+    0x6f = Unknown3,
     0x40 = CarList,
     0x41 = SessionTimeLeft,
     0x42 = WrongProtocol,

@@ -1,13 +1,6 @@
-use byteorder::ReadBytesExt;
-
 use super::*;
 use crate::{io::Readable, io::Writeable, packets::common::Vec3f};
 
-packets! {
-    MD5{
-
-    }
-}
 packets! {
     AdminCommandPlugin{
         cmd WideString;
@@ -32,7 +25,7 @@ packets! {
         server_password  String;
     }
     CarlistRequest {
-        unknown u8;
+        index u8;
     }
     Disconnect{}
     ChangeTireCompound{
@@ -88,7 +81,7 @@ packets! {
         unknown u8;
     }
     Checksum{
-        checksums BytePrefixedVec<MD5>;
+        checksums BytePrefixedVec<MD5Array>;
     }
 
     DamageUpdate {
@@ -99,9 +92,9 @@ packets! {
         damage4 f32; //r sus
         damage5 f32; //chasis
     }
-    Unknown1 {
-        unknown u16;
-        unknown2 u8;
+    P2PCount {
+        count u16;
+        unknown2 i8;
     }
 
 }
@@ -166,9 +159,14 @@ packet_enum!(UdpPlugin {
     0xce = KickPlugin,
 
 });
+
+packet_enum!(HandShake{
+    0x3d = JoinRequest,
+});
+
 packet_enum!(TestClient {
     0xe = Unknown,
-    0xd = Unknown1,
+    0x0d = P2PCount,
     0xf9 = Ping,
     0x3d = JoinRequest,
     0x3f = CarlistRequest,

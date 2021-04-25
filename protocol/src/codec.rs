@@ -44,18 +44,22 @@ impl Codec {
         T: Readable,
     {
         let mut cursor = Cursor::new(&self.received_buf[..]);
+        println!("{:?}", cursor);
         let packet = if let Ok(length) = u16::read(&mut cursor) {
             let length_field_length = cursor.position() as usize;
+            println!("len{}", length);
 
             if self.received_buf.len() - length_field_length >= length as usize {
                 cursor = Cursor::new(
                     &self.received_buf[length_field_length..length_field_length + length as usize],
                 );
+                println!("{:?}", cursor);
 
                 let packet = T::read(&mut cursor)?;
 
                 let bytes_read = cursor.position() as usize + length_field_length;
                 self.received_buf = self.received_buf.split_off(bytes_read);
+                //self.received_buf.clear();
 
                 Some(packet)
             } else {
