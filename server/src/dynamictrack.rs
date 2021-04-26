@@ -32,6 +32,9 @@ impl DynamicTrack {
         self.laps.set(0);
     }
     pub fn grip(&self) -> f32 {
+        if !self.enabled {
+            1.0
+        }
         (self.base_grip + self.grip_per_lap * self.laps.get() as f32).clamp(0.0, 1.0)
     }
 }

@@ -7,11 +7,27 @@ packets! {
     }
     NextSessionPlugin{}
     RestartSessionPlugin{}
-    SessionInfoPlugin{
+    SetSessionInfoPlugin{
         session_infos BytePrefixedVec<SessionInfoU>;
     }
     KickPlugin{
         session_id u8;
+    }
+    SetRealTimePosPlugin{
+        realtime_pos u16;
+    }
+    RequestCarInfoPlugin{
+        session_id u8;
+    }
+    ChatPlugin{
+        session_id u8;
+        msg WideString;
+    }
+    BroadcastPlugin{
+        msg WideString;
+    }
+    SessionInfoPlugin{
+        unknown u16;
     }
 }
 packets! {
@@ -191,8 +207,13 @@ packet_enum!(UdpPlugin {
     0xd1 = AdminCommandPlugin,
     0xcf = NextSessionPlugin,
     0xd0 = RestartSessionPlugin,
-    0xcd = SessionInfoPlugin,
+    0xcd = SetSessionInfoPlugin,
     0xce = KickPlugin,
+    0xcc = SessionInfoPlugin,
+    0xc8 = SetRealTimePosPlugin,
+    0xc9 = RequestCarInfoPlugin,
+    0xca = ChatPlugin,
+    0xcb = BroadcastPlugin,
 
 });
 

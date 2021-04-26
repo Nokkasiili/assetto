@@ -77,7 +77,7 @@ packets! {
         //%d) %s BEST: %s TOTAL: %s Laps:%d SesID:%d HasFinished:%t
         session_id u8;
         best_lap u32;
-        total_time u32;
+      //  total_time u32;
         lap_count u16;
         has_completed_last_lap bool;
     }
@@ -316,6 +316,9 @@ packets! {
     Unknown3{
         unknown WideString;
     }
+    ClientFirstUpdateUdp{
+        session_id u8;
+    }
 }
 #[derive(Debug, Clone)]
 pub struct RaceOver2 {
@@ -411,7 +414,7 @@ packets! {
         session_id u8;
         msg WideString;
     }
-    SessionClosedPlugin{
+    ConnectionClosedPlugin{
         name WideString;
         guid WideString;
         session_id u8;
@@ -424,7 +427,7 @@ packet_enum!(UdpPlugin{
     0x32 = SessionInfoPlugin,
     0x3b = SessionInfoPlugin1,
     0x33 = NewCarConnectionPlugin,
-    0x34 = SessionClosedPlugin,
+    0x34 = ConnectionClosedPlugin,
     0x37 = EndSessionPlugin,
     0x38 = SendVersionPlugin,
     0x39 = ChatPlugin,
@@ -441,14 +444,17 @@ packet_enum!(TestServer {
     0xf9 = Ping,
     0x4a = UpdateSession,
     0x3e = NewCarConnection,
+    0x3a = ClientFirstUpdateUdp,
     0x3b = Banned,
     0x3c = WrongPassword,
+    //0x3c = UdpError WideString,
     0x4a = Session,
     0x4d = ClientDisconnect,
     0x4b = RaceOver2,
     0x5a = Unknown2,
     0x5b = Names,
     0x6f = Unknown3,
+    //0x36 =
     0x40 = CarList,
     0x41 = SessionTimeLeft,
     0x42 = WrongProtocol,
@@ -518,5 +524,21 @@ mod tests {
         assert_eq!(over.unknown, p.unknown);
         assert_eq!(over.lap_data.len(), p.lap_data.len());
         //assert_eq!(over.lap_data[0].best_lap, p.lap_data[0].best_lap);
+    }
+    #[test]
+    fn shitfack_test() {
+        let mut buffer: Vec<u8> = vec![
+            255, 0, 0, 0, 0, 0, 5, 0, 255, 201, 154, 59, 0, 0, 0, 1, 255, 201, 154, 59, 0, 0, 0, 2,
+            255, 201, 154, 59, 0, 0, 0, 3, 255, 201, 154, 59, 0, 0, 0, 4, 255, 201, 154, 59, 0, 0,
+            0, 0, 0, 128, 63,
+        ];
+
+        let mut cursor = Cursor::new(&buffer[..]);
+        let p = LapCompleted::read(&mut cursor).unwrap();
+        println!("{:?}", p);
+        assert_eq!(cursor.position() as usize, buffer.len());
+        let mut paska: Vec<u8> = Vec::new();
+        p.write(&mut paska);
+        assert_eq!(buffer, paska);
     }
 }
