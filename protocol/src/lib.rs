@@ -132,11 +132,3 @@ impl From<TestServer> for ServerPacket {
         ServerPacket::TestServer(packet)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}

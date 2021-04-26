@@ -97,7 +97,43 @@ packets! {
         unknown2 i8;
     }
 
+    LapCompleted{
+        unknown u32;
+        unknown1 u32;
+        //unknown u8;
+        unknown2 BytePrefixedVec<u32>;
+        unknown3 u8;
+        unknown4 u8;
+    }
+
 }
+#[derive(Debug, Clone)]
+pub struct Checksum2 {
+    checksums: Vec<MD5Array>,
+}
+
+impl Writeable for Checksum2 {
+    fn write(&self, buffer: &mut Vec<u8>) -> Result<(), anyhow::Error> {
+        self.checksums.iter().try_for_each(|x| x.write(buffer))?;
+        Ok(())
+    }
+}
+impl Readable for Checksum2 {
+    fn read(buffer: &mut std::io::Cursor<&[u8]>) -> Result<Self, anyhow::Error> {
+        let mut checksums: Vec<MD5Array> = Vec::new();
+
+        //let len = buffer.clone().into_inner().len();
+        let len = buffer.get_ref().len(); //this is wrong
+        if 0 < len {
+            let length = len / 16 + 1;
+            checksums = std::iter::repeat_with(|| MD5Array::read(buffer))
+                .take(length)
+                .collect::<anyhow::Result<Vec<MD5Array>>>()?;
+        }
+        Ok(Checksum2 { checksums })
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Event {
     event_type: u16,
@@ -174,6 +210,7 @@ packet_enum!(TestClient {
     0x4f = SessionRequest,
     0x44 = Checksum,
     0x46 = CarUpdate,
+    0x49 = LapCompleted,
     0x50 = ChangeTireCompound,
     0x56 = DamageUpdate,
     0x58 = SectorSplit,

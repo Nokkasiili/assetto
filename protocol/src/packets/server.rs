@@ -1,5 +1,9 @@
+use std::mem::size_of;
+
 use super::*;
-use crate::packets::common::Vec3f;
+use crate::Readable;
+use crate::{io::Writeable, packets::common::Vec3f};
+use std::iter;
 
 def_enum! {
     CollisionType (u8) {
@@ -69,6 +73,21 @@ packets! {
         session_id u8;
         name WideString;
     }
+    SessionBest{
+        //%d) %s BEST: %s TOTAL: %s Laps:%d SesID:%d HasFinished:%t
+        session_id u8;
+        best_lap u32;
+        total_time u32;
+        lap_count u16;
+        has_completed_last_lap bool;
+    }
+    RaceBest{
+        //"%d) %s BEST: %s TOTAL: %s Laps:%d SesID:%d Rank:%d
+        session_id u8;
+        best_lap u32;
+        total_time u32;
+        lap_count u16;
+    }
 }
 
 packets! {
@@ -115,7 +134,7 @@ packets! {
         player_position u8;
 
         time i64;
-        checksum_files BytePrefixedVec<MD5Array>;
+        checksum_files BytePrefixedVec<String>;
         legal_tyres String;
 
         random_seed u32;
@@ -139,14 +158,11 @@ packets! {
         session_id u8;
         reason u8;
     }
-    LapCompeleted{
+    LapCompleted{
         session_id u8;
         unknown1 u32;
         unknown2 u8;
-        players_length u8;
-        session_best u32;
-        laps u16;
-        completed bool;
+        session_bests BytePrefixedVec<SessionBest>;
         grip_level f32;
     }
     MandatoryPit{
@@ -211,6 +227,8 @@ packets! {
     }
     RaceOver{
         //missing
+        //Vec<RaceBest>
+        unknown bool;
     }
     DamageUpdate {
         session_id u8;
@@ -255,7 +273,7 @@ packets! {
         unknown u8;
     }
     WelcomeMessage{
-        unknown u8;
+        unknown u8;//always zero
         welcome_msg WideString;// wrong
     }
 
@@ -297,6 +315,38 @@ packets! {
     }
     Unknown3{
         unknown WideString;
+    }
+}
+#[derive(Debug, Clone)]
+pub struct RaceOver2 {
+    lap_data: Vec<RaceBest>,
+    unknown: bool,
+}
+
+impl Writeable for RaceOver2 {
+    fn write(&self, buffer: &mut Vec<u8>) -> Result<(), anyhow::Error> {
+        self.lap_data.iter().try_for_each(|x| x.write(buffer))?;
+        self.unknown.write(buffer)?;
+        Ok(())
+    }
+}
+
+impl Readable for RaceOver2 {
+    fn read(buffer: &mut std::io::Cursor<&[u8]>) -> Result<Self, anyhow::Error> {
+        let mut lap_data: Vec<RaceBest> = Vec::new();
+        let len = buffer.get_ref().len() - size_of::<bool>(); //this is wrong
+
+        //let len = buffer.clone().into_inner().len() - size_of::<bool>();
+
+        if 0 < len {
+            let length = len / size_of::<RaceBest>() + 1;
+            lap_data = iter::repeat_with(|| RaceBest::read(buffer))
+                .take(length)
+                .collect::<anyhow::Result<Vec<RaceBest>>>()?;
+        }
+        let unknown = bool::read(buffer)?;
+
+        Ok(Self { lap_data, unknown })
     }
 }
 
@@ -395,7 +445,7 @@ packet_enum!(TestServer {
     0x3c = WrongPassword,
     0x4a = Session,
     0x4d = ClientDisconnect,
-    0x4b = RaceOver,
+    0x4b = RaceOver2,
     0x5a = Unknown2,
     0x5b = Names,
     0x6f = Unknown3,
@@ -404,7 +454,7 @@ packet_enum!(TestServer {
     0x42 = WrongProtocol,
     0x45 = NoSlotsForCarModel,
     0x47 = Chat,
-    0x49 = LapCompeleted,
+    0x49 = LapCompleted,
     0x50 = ChangeTireCompound,
     0x51 = WelcomeMessage,
     0x52 = CarSetup,
@@ -423,3 +473,50 @@ packet_enum!(TestServer {
     0x78 = Weather,
     0x8c = PingCache,
 });
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+
+    #[test]
+    fn de_encode_test() {
+        let lap_data = RaceBest {
+            session_id: 1,
+            best_lap: 22,
+            total_time: 2,
+            lap_count: 2,
+        };
+        let p = RaceOver2 {
+            lap_data: vec![lap_data.clone(), lap_data.clone(), lap_data],
+            unknown: true,
+        };
+        let mut buffer = Vec::new();
+        p.write(&mut buffer).unwrap();
+        let mut cursor = Cursor::new(&buffer[..]);
+        let over = RaceOver2::read(&mut cursor).unwrap();
+        assert_eq!(over.unknown, p.unknown);
+        assert_eq!(over.lap_data.len(), p.lap_data.len());
+        assert_eq!(over.lap_data[0].best_lap, p.lap_data[0].best_lap);
+    }
+    #[test]
+    fn de2_encode_test() {
+        let lap_data = RaceBest {
+            session_id: 1,
+            best_lap: 22,
+            total_time: 2,
+            lap_count: 2,
+        };
+        let p = RaceOver2 {
+            lap_data: vec![],
+            unknown: true,
+        };
+        let mut buffer = Vec::new();
+        p.write(&mut buffer).unwrap();
+        let mut cursor = Cursor::new(&buffer[..]);
+        let over = RaceOver2::read(&mut cursor).unwrap();
+        assert_eq!(over.unknown, p.unknown);
+        assert_eq!(over.lap_data.len(), p.lap_data.len());
+        //assert_eq!(over.lap_data[0].best_lap, p.lap_data[0].best_lap);
+    }
+}
