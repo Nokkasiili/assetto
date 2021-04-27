@@ -96,9 +96,9 @@ packets! {
     SessionRequest{
         unknown u8;
     }
-    Checksum{
+    /*Checksum{
         checksums BytePrefixedVec<MD5Array>;
-    }
+    }*/
 
     DamageUpdate {
         damage f32; //engine?
@@ -124,29 +124,29 @@ packets! {
 
 }
 #[derive(Debug, Clone)]
-pub struct Checksum2 {
+pub struct Checksum {
     checksums: Vec<MD5Array>,
 }
 
-impl Writeable for Checksum2 {
+impl Writeable for Checksum {
     fn write(&self, buffer: &mut Vec<u8>) -> Result<(), anyhow::Error> {
         self.checksums.iter().try_for_each(|x| x.write(buffer))?;
         Ok(())
     }
 }
-impl Readable for Checksum2 {
+impl Readable for Checksum {
     fn read(buffer: &mut std::io::Cursor<&[u8]>) -> Result<Self, anyhow::Error> {
         let mut checksums: Vec<MD5Array> = Vec::new();
 
         //let len = buffer.clone().into_inner().len();
         let len = buffer.get_ref().len(); //this is wrong
         if 0 < len {
-            let length = len / 16 + 1;
+            let length = len / 16;
             checksums = std::iter::repeat_with(|| MD5Array::read(buffer))
                 .take(length)
                 .collect::<anyhow::Result<Vec<MD5Array>>>()?;
         }
-        Ok(Checksum2 { checksums })
+        Ok(Checksum { checksums })
     }
 }
 
@@ -240,3 +240,34 @@ packet_enum!(TestClient {
     0x66 = KickVote,
     0x82 = Event,
 });
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use md5::Digest;
+    use std::io::Cursor;
+
+    #[test]
+    fn checksums_test() {
+        //68
+        let buffer: Vec<u8> = vec![
+            65, 148, 155, 159, 112, 69, 202, 210, 175, 63, 94, 185, 81, 209, 112, 169, 122, 149,
+            98, 126, 145, 191, 123, 62, 186, 49, 35, 51, 57, 44, 227, 242, 180, 44, 212, 154, 142,
+            58, 179, 7, 151, 249, 214, 133, 122, 212, 210, 230, 214, 215, 24, 236, 202, 119, 52,
+            47, 22, 232, 203, 108, 13, 77, 189, 47,
+        ];
+        let outputs = vec![
+            "41949b9f7045cad2af3f5eb951d170a9",
+            "7a95627e91bf7b3eba312333392ce3f2",
+            "b42cd49a8e3ab30797f9d6857ad4d2e6",
+            "d6d718ecca77342f16e8cb6c0d4dbd2f",
+        ];
+        let mut cursor = Cursor::new(&buffer[..]);
+        let p = Checksum::read(&mut cursor).unwrap();
+        p.checksums.iter().enumerate().for_each(|(i, f)| {
+            assert_eq!(format!("{:x}", Digest { 0: f.0 }), outputs[i]);
+        });
+
+        assert_eq!(cursor.position() as usize, buffer.len());
+    }
+}

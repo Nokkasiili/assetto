@@ -1,5 +1,6 @@
 use anyhow::{bail, Context};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use md5::Digest;
 use std::borrow::Cow;
 use std::convert::{TryFrom, TryInto};
 use std::io::{Cursor, Read};
@@ -203,23 +204,24 @@ impl Writeable for bool {
     }
 }
 #[derive(Debug, Clone)]
-pub struct MD5Array(pub Vec<u8>);
+pub struct MD5Array(pub [u8; 16]);
+//pub struct Digest(pub [u8; 16]);
 impl Readable for MD5Array {
     fn read(buffer: &mut std::io::Cursor<&[u8]>) -> Result<Self, anyhow::Error> {
-        /*        let length: usize = u8::read(buffer)
-                    .context("failed to read md5 length")?
-                    .into();
-        */
-        let mut vec = vec![0u8; 16];
-        buffer.read_exact(&mut vec)?;
-        Ok(MD5Array(vec))
+        let mut md5 = [0u8; 16];
+        buffer.read_exact(&mut md5)?;
+        Ok(MD5Array(md5))
     }
 }
 impl Writeable for MD5Array {
     fn write(&self, buffer: &mut Vec<u8>) -> Result<(), anyhow::Error> {
-        //(self.0.len() as u8).write(buffer)?;
         buffer.extend_from_slice(&self.0);
         Ok(())
+    }
+}
+impl From<Digest> for MD5Array {
+    fn from(digest: Digest) -> Self {
+        MD5Array(digest.0)
     }
 }
 
