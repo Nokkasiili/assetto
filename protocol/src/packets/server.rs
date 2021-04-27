@@ -85,7 +85,7 @@ packets! {
         //"%d) %s BEST: %s TOTAL: %s Laps:%d SesID:%d Rank:%d
         session_id u8;
         best_lap u32;
-        total_time u32;
+    //    total_time u32;
         lap_count u16;
     }
 }
@@ -225,11 +225,6 @@ packets! {
         unknown3 u32; // time
         ping u16;
     }
-    RaceOver{
-        //missing
-        //Vec<RaceBest>
-        unknown bool;
-    }
     DamageUpdate {
         session_id u8;
         damage f32; //engine?
@@ -321,12 +316,12 @@ packets! {
     }
 }
 #[derive(Debug, Clone)]
-pub struct RaceOver2 {
+pub struct RaceOver {
     lap_data: Vec<RaceBest>,
-    unknown: bool,
+    unknown: bool, // true if session == race, race => over . resets stats?
 }
 
-impl Writeable for RaceOver2 {
+impl Writeable for RaceOver {
     fn write(&self, buffer: &mut Vec<u8>) -> Result<(), anyhow::Error> {
         self.lap_data.iter().try_for_each(|x| x.write(buffer))?;
         self.unknown.write(buffer)?;
@@ -334,7 +329,7 @@ impl Writeable for RaceOver2 {
     }
 }
 
-impl Readable for RaceOver2 {
+impl Readable for RaceOver {
     fn read(buffer: &mut std::io::Cursor<&[u8]>) -> Result<Self, anyhow::Error> {
         let mut lap_data: Vec<RaceBest> = Vec::new();
         let len = buffer.get_ref().len() - size_of::<bool>(); //this is wrong
@@ -450,7 +445,7 @@ packet_enum!(TestServer {
     //0x3c = UdpError WideString,
     0x4a = Session,
     0x4d = ClientDisconnect,
-    0x4b = RaceOver2,
+    0x4b = RaceOver,
     0x5a = Unknown2,
     0x5b = Names,
     0x6f = Unknown3,
@@ -486,48 +481,8 @@ mod tests {
     use std::io::Cursor;
 
     #[test]
-    fn de_encode_test() {
-        let lap_data = RaceBest {
-            session_id: 1,
-            best_lap: 22,
-            total_time: 2,
-            lap_count: 2,
-        };
-        let p = RaceOver2 {
-            lap_data: vec![lap_data.clone(), lap_data.clone(), lap_data],
-            unknown: true,
-        };
-        let mut buffer = Vec::new();
-        p.write(&mut buffer).unwrap();
-        let mut cursor = Cursor::new(&buffer[..]);
-        let over = RaceOver2::read(&mut cursor).unwrap();
-        assert_eq!(over.unknown, p.unknown);
-        assert_eq!(over.lap_data.len(), p.lap_data.len());
-        assert_eq!(over.lap_data[0].best_lap, p.lap_data[0].best_lap);
-    }
-    #[test]
-    fn de2_encode_test() {
-        let lap_data = RaceBest {
-            session_id: 1,
-            best_lap: 22,
-            total_time: 2,
-            lap_count: 2,
-        };
-        let p = RaceOver2 {
-            lap_data: vec![],
-            unknown: true,
-        };
-        let mut buffer = Vec::new();
-        p.write(&mut buffer).unwrap();
-        let mut cursor = Cursor::new(&buffer[..]);
-        let over = RaceOver2::read(&mut cursor).unwrap();
-        assert_eq!(over.unknown, p.unknown);
-        assert_eq!(over.lap_data.len(), p.lap_data.len());
-        //assert_eq!(over.lap_data[0].best_lap, p.lap_data[0].best_lap);
-    }
-    #[test]
-    fn shitfack_test() {
-        let mut buffer: Vec<u8> = vec![
+    fn lap_completed_test() {
+        let buffer: Vec<u8> = vec![
             255, 0, 0, 0, 0, 0, 5, 0, 255, 201, 154, 59, 0, 0, 0, 1, 255, 201, 154, 59, 0, 0, 0, 2,
             255, 201, 154, 59, 0, 0, 0, 3, 255, 201, 154, 59, 0, 0, 0, 4, 255, 201, 154, 59, 0, 0,
             0, 0, 0, 128, 63,
@@ -537,8 +492,18 @@ mod tests {
         let p = LapCompleted::read(&mut cursor).unwrap();
         println!("{:?}", p);
         assert_eq!(cursor.position() as usize, buffer.len());
-        let mut paska: Vec<u8> = Vec::new();
-        p.write(&mut paska);
-        assert_eq!(buffer, paska);
+    }
+    #[test]
+    fn race_best_test() {
+        //75
+        let buffer: Vec<u8> = vec![
+            0, 120, 140, 2, 0, 1, 0, 1, 255, 201, 154, 59, 0, 0, 2, 255, 201, 154, 59, 0, 0, 3,
+            255, 201, 154, 59, 0, 0, 4, 255, 201, 154, 59, 0, 0, 1,
+        ];
+        let mut cursor = Cursor::new(&buffer[..]);
+        let p = RaceOver::read(&mut cursor).unwrap();
+        println!("{:?}", p);
+
+        assert_eq!(cursor.position() as usize, buffer.len());
     }
 }

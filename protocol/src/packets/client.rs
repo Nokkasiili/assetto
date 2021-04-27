@@ -47,6 +47,11 @@ packets! {
     ChangeTireCompound{
         tire_compound String;
     }
+    Pong{
+        unknown u32;
+        unknown2 u32;
+    }
+    Pulse{}
     Ping{
         unknown u32;
         unknown2 u16;
@@ -101,12 +106,12 @@ packets! {
     }*/
 
     DamageUpdate {
-        damage f32; //engine?
-        damage1 f32; //gear
-        damage2 f32; //f sus
-        damage3 f32; //steering
-        damage4 f32; //r sus
-        damage5 f32; //chasis
+        damage f32;
+        damage1 f32;
+        damage2 f32;
+        damage3 f32;
+        damage4 f32;
+    //    damage5 f32; //chasis
     }
     P2PCount {
         count u16;
@@ -121,6 +126,11 @@ packets! {
         unknown3 u8;
         unknown4 u8;
     }
+    Chat{
+        unknown u8;
+        msg WideString;
+    }
+
 
 }
 #[derive(Debug, Clone)]
@@ -217,20 +227,23 @@ packet_enum!(UdpPlugin {
 
 });
 
-packet_enum!(HandShake{
+packet_enum!(HandShakeStatus{
     0x3d = JoinRequest,
 });
 
 packet_enum!(TestClient {
     0xe = Unknown,
     0x0d = P2PCount,
+    0xf8 = Pong, //udp
     0xf9 = Ping,
     0x3d = JoinRequest,
     0x3f = CarlistRequest,
     0x43 = Disconnect,
-    0x4f = SessionRequest,
+    0x4f = SessionRequest,//udp
+    0x4c = Pulse,//udp
     0x44 = Checksum,
     0x46 = CarUpdate,
+    0x47 = Chat,
     0x49 = LapCompleted,
     0x50 = ChangeTireCompound,
     0x56 = DamageUpdate,
@@ -267,6 +280,17 @@ mod tests {
         p.checksums.iter().enumerate().for_each(|(i, f)| {
             assert_eq!(format!("{:x}", Digest { 0: f.0 }), outputs[i]);
         });
+
+        assert_eq!(cursor.position() as usize, buffer.len());
+    }
+    #[test]
+    fn damage_update_test() {
+        //86
+        let buffer: Vec<u8> = vec![
+            187, 200, 186, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 187, 200, 186, 64,
+        ];
+        let mut cursor = Cursor::new(&buffer[..]);
+        let p = DamageUpdate::read(&mut cursor).unwrap();
 
         assert_eq!(cursor.position() as usize, buffer.len());
     }
