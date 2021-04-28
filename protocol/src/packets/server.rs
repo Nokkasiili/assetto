@@ -6,12 +6,6 @@ use crate::{io::Writeable, packets::common::Vec3f};
 use std::iter;
 
 def_enum! {
-    CollisionType (u8) {
-        10 = CarCollision,
-        11 = WorldCollision,
-    }
-}
-def_enum! {
     OnOffFactoryOption (i8) {
         0 = Denied,
         1 = Factory,

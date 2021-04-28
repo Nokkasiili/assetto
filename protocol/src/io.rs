@@ -346,3 +346,4 @@ where
 }
 
 pub type BytePrefixedVec<'a, T> = LengthPrefixedVec<'a, u8, T>;
+pub type U16PrefixedVec<'a, T> = LengthPrefixedVec<'a, u16, T>;

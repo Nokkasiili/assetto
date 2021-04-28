@@ -1,6 +1,13 @@
 use super::*;
 use crate::{io::Readable, io::Writeable, packets::common::Vec3f};
 
+def_enum! {
+    CollisionType (u8) {
+        0xa = CarCollision,
+        0xb = WorldCollision,
+        0xc = UnknownCollision, //send 0xc
+    }
+}
 packets! {
     AdminCommandPlugin{
         cmd WideString;
@@ -130,7 +137,9 @@ packets! {
         unknown u8;
         msg WideString;
     }
-
+    Event{
+        events U16PrefixedVec<EventS>;
+    }
 
 }
 #[derive(Debug, Clone)]
@@ -161,14 +170,15 @@ impl Readable for Checksum {
 }
 
 #[derive(Debug, Clone)]
-pub struct Event {
-    event_type: u16,
+pub struct EventS {
+    //event_length: u16,
+    event_type: CollisionType,
     other_car: Option<u8>,
     impact_speed: f32,
     world_pos: Vec3f,
     real_pos: Vec3f,
 }
-impl Writeable for Event {
+impl Writeable for EventS {
     fn write(&self, buffer: &mut Vec<u8>) -> anyhow::Result<()> {
         self.event_type.write(buffer)?;
         if let Some(other_car) = self.other_car {
@@ -180,14 +190,30 @@ impl Writeable for Event {
         Ok(())
     }
 }
-impl Readable for Event {
+impl Readable for EventS {
     fn read(buffer: &mut std::io::Cursor<&[u8]>) -> anyhow::Result<Self> {
-        let event_type = u16::read(buffer)?;
-        let has_other_car = bool::read(buffer)?;
+        let event_type = CollisionType::read(buffer)?;
         let other_car = {
-            match has_other_car {
-                true => Some(u8::read(buffer)?),
-                false => None,
+            match event_type {
+                CollisionType::CarCollision => Some(u8::read(buffer)?),
+                CollisionType::WorldCollision => None,
+                _ => {
+                    return Ok(Self {
+                        event_type,
+                        other_car: None,
+                        impact_speed: 0.0,
+                        world_pos: Vec3f {
+                            x: 0.0,
+                            y: 0.0,
+                            z: 0.0,
+                        },
+                        real_pos: Vec3f {
+                            x: 0.0,
+                            y: 0.0,
+                            z: 0.0,
+                        },
+                    });
+                }
             }
         };
         let impact_speed = f32::read(buffer)?;
@@ -259,7 +285,19 @@ mod tests {
     use super::*;
     use md5::Digest;
     use std::io::Cursor;
+    #[test]
+    fn event_test() {
+        //130
+        let buffer: Vec<u8> = vec![
+            1, 0, 11, 116, 62, 45, 66, 238, 67, 167, 195, 168, 53, 128, 62, 133, 102, 34, 194, 0,
+            0, 226, 54, 198, 195, 210, 190, 178, 72, 6, 64,
+        ];
+        let mut cursor = Cursor::new(&buffer[..]);
+        let p = Event::read(&mut cursor).unwrap();
+        println!("{:?}", p);
 
+        assert_eq!(cursor.position() as usize, buffer.len());
+    }
     #[test]
     fn checksums_test() {
         //68
@@ -291,6 +329,7 @@ mod tests {
         ];
         let mut cursor = Cursor::new(&buffer[..]);
         let p = DamageUpdate::read(&mut cursor).unwrap();
+        println!("{:?}", p);
 
         assert_eq!(cursor.position() as usize, buffer.len());
     }

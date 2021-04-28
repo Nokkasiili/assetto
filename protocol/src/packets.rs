@@ -5,6 +5,9 @@ macro_rules! user_type {
     (BytePrefixedVec <$inner:ident>) => {
         Vec<$inner>
     };
+    (U16PrefixedVec <$inner:ident>) => {
+        Vec<$inner>
+    };
     ($typ:ty) => {
         $typ
     };
@@ -16,6 +19,9 @@ macro_rules! user_type_convert_to_writeable {
     };
     (BytePrefixedVec <$inner:ident>, $e:expr) => {
         BytePrefixedVec::from($e.as_slice())
+    };
+    (U16PrefixedVec <$inner:ident>, $e:expr) => {
+        U16PrefixedVec::from($e.as_slice())
     };
     ($typ:ty, $e:expr) => {
         $e
@@ -267,6 +273,7 @@ pub trait VariantOf<Enum> {
 }
 use crate::io::BytePrefixedVec;
 use crate::io::MD5Array;
+use crate::io::U16PrefixedVec;
 use crate::io::WideString;
 pub mod client;
 pub mod common;
