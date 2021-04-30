@@ -18,16 +18,16 @@ packets! {
         session_infos BytePrefixedVec<SessionInfoU>;
     }
     KickPlugin{
-        session_id u8;
+        car_id u8;
     }
     SetRealTimePosPlugin{
         realtime_pos u16;
     }
     RequestCarInfoPlugin{
-        session_id u8;
+        car_id u8;
     }
     ChatPlugin{
-        session_id u8;
+        car_id u8;
         msg WideString;
     }
     BroadcastPlugin{
@@ -79,7 +79,7 @@ packets! {
     }
 
     KickVote{
-        session_id u8;
+        car_id u8;
         unknown2 u8;
     }
     CarUpdate{
@@ -139,6 +139,12 @@ packets! {
     }
     Event{
         events U16PrefixedVec<EventS>;
+    }
+    LobbyCheckMessage{
+
+    }
+    UpdateUpdAddress{
+        car_id u8;
     }
 
 }
@@ -258,6 +264,7 @@ packet_enum!(HandShakeStatus{
 });
 
 packet_enum!(TestClient {
+    0xc8 = LobbyCheckMessage,
     0xe = Unknown,
     0x0d = P2PCount,
     0xf8 = Pong, //udp
@@ -265,6 +272,7 @@ packet_enum!(TestClient {
     0x3d = JoinRequest,
     0x3f = CarlistRequest,
     0x43 = Disconnect,
+    0x4e = UpdateUpdAddress, //udp
     0x4f = SessionRequest,//udp
     0x4c = Pulse,//udp
     0x44 = Checksum,

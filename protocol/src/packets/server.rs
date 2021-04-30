@@ -41,7 +41,7 @@ packets! {
         value f32;
     }
     Bop{
-        session_id u8;
+        car_id u8;
         ballast f32;
         unknown f32;
     }
@@ -64,12 +64,12 @@ packets! {
         damage4 f32;
     }
     Name{
-        session_id u8;
+        car_id u8;
         name WideString;
     }
     SessionBest{
         //%d) %s BEST: %s TOTAL: %s Laps:%d SesID:%d HasFinished:%t
-        session_id u8;
+        car_id u8;
         best_lap u32;
       //  total_time u32;
         lap_count u16;
@@ -77,7 +77,7 @@ packets! {
     }
     RaceBest{
         //"%d) %s BEST: %s TOTAL: %s Laps:%d SesID:%d Rank:%d
-        session_id u8;
+        car_id u8;
         best_lap u32;
     //    total_time u32;
         lap_count u16;
@@ -149,23 +149,23 @@ packets! {
         wind_direction i16;
     }
     Kick{
-        session_id u8;
+        car_id u8;
         reason u8;
     }
     LapCompleted{
-        session_id u8;
+        car_id u8;
         unknown1 u32;
         unknown2 u8;
         session_bests BytePrefixedVec<SessionBest>;
         grip_level f32;
     }
     MandatoryPit{
-        session_id u8;
+        car_id u8;
         mandatory_pit bool;
     }
 
     ChangeTireCompound{
-        session_id u8;
+        car_id u8;
         tire_compound String;
     }
 
@@ -184,19 +184,10 @@ packets! {
         unknown1 u16;
     }
 
-    UpdateSession {
-        session_name String;
-        session_index u8;
-        session_type SessionType;
-        session_time u16;
-        session_laps u16;
-        grip_level f32;
-        grid_position u8;
-        time i64;
-    }
     Bops{
         cars BytePrefixedVec<Bop>;
     }
+
     SessionClosed{}
 
     Unknown{
@@ -211,7 +202,7 @@ packets! {
     Banned{
     }
     ClientDisconnect{
-        session_id u8;
+        car_id u8;
     }
     RaceStart{
         unknown i16; //timestatus
@@ -220,7 +211,7 @@ packets! {
         ping u16;
     }
     DamageUpdate {
-        session_id u8;
+        car_id u8;
         damage f32; //engine?
         damage1 f32; //gear
         damage2 f32; //f sus
@@ -232,7 +223,7 @@ packets! {
         zones BytePrefixedVec<DRSZone>;
     }
     SectorSplit{
-        session_id u8;
+        car_id u8;
         unknown2 u8;
         unknown3 u32;
         unknown4 u8;
@@ -257,7 +248,7 @@ packets! {
         driver_names  BytePrefixedVec<Name>;
     }
     P2PCount{
-        session_id u8;
+        car_id u8;
         p2p_count i16;
         unknown u8;
     }
@@ -267,7 +258,7 @@ packets! {
     }
 
     Unknown2{
-        session_id u8;
+        car_id u8;
         unknown String;
         unknown2 String;
     }
@@ -287,7 +278,7 @@ packets! {
         last_vote bool;
     }
     KickVote{
-        session_id u8;
+        car_id u8;
         unknown u8;
         unknown1 u8;
         dead_line u32;
@@ -306,7 +297,23 @@ packets! {
         unknown WideString;
     }
     ClientFirstUpdateUdp{
-        session_id u8;
+        car_id u8;
+    }
+    LobbyCheckMessage{
+        http_port u16;
+    }
+    UpdateUpdAddress{}
+
+    Unknown4{
+        unknown u64;
+        unknown2 u32;
+    }
+    PingCache2{
+        useless u8;
+        ping_cache u8;
+    }
+    UdpError{
+        error WideString;
     }
 }
 #[derive(Debug, Clone)]
@@ -328,8 +335,6 @@ impl Readable for RaceOver {
         let mut lap_data: Vec<RaceBest> = Vec::new();
         let len = buffer.get_ref().len() - size_of::<bool>(); //this is wrong
 
-        //let len = buffer.clone().into_inner().len() - size_of::<bool>();
-
         if 0 < len {
             let length = len / size_of::<RaceBest>() + 1;
             lap_data = iter::repeat_with(|| RaceBest::read(buffer))
@@ -342,11 +347,70 @@ impl Readable for RaceOver {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct UpdateSession {
+    session_name: String,
+    session_index: u8,
+    session_type: SessionType,
+    session_time: u16,
+    session_laps: u16,
+    grip_level: f32,
+    //grid_position: u8,
+    grid_position: Vec<u8>,
+    time: i64,
+}
+impl Writeable for UpdateSession {
+    fn write(&self, buffer: &mut Vec<u8>) -> Result<(), anyhow::Error> {
+        self.session_name.write(buffer)?;
+        self.session_index.write(buffer)?;
+        self.session_type.write(buffer)?;
+        self.session_time.write(buffer)?;
+        self.session_laps.write(buffer)?;
+        self.grip_level.write(buffer)?;
+        for i in self.grid_position.iter() {
+            i.write(buffer)?;
+        }
+
+        self.session_time.write(buffer)?;
+
+        Ok(())
+    }
+}
+impl Readable for UpdateSession {
+    fn read(buffer: &mut std::io::Cursor<&[u8]>) -> Result<Self, anyhow::Error> {
+        let length = buffer.get_ref().len();
+        let session_name = String::read(buffer)?;
+        let session_index = u8::read(buffer)?;
+        let session_type = SessionType::read(buffer)?;
+        let session_time = u16::read(buffer)?;
+        let session_laps = u16::read(buffer)?;
+        let grip_level = f32::read(buffer)?;
+
+        let count = length - buffer.position() as usize - size_of::<i64>();
+
+        let grid_position = iter::repeat_with(|| u8::read(buffer))
+            .take(count)
+            .collect::<anyhow::Result<Vec<u8>>>()?;
+
+        let time = i64::read(buffer)?;
+        Ok(Self {
+            session_name,
+            session_index,
+            session_type,
+            session_time,
+            session_laps,
+            grip_level,
+            grid_position,
+            time,
+        })
+    }
+}
+
 packets! {
     NewCarConnectionPlugin{
         name WideString;
         guid WideString;
-        session_id u8;
+        car_id u8;
         car_model String;
         car_skin String;
     }
@@ -356,7 +420,7 @@ packets! {
     }
     ClientEventPlugin {
         event_type u8;
-        session_id u8;
+        car_id u8;
 
         other_car Option<u8>;//optional
 
@@ -400,13 +464,13 @@ packets! {
         elapsed_ms i32;
     }
     ChatPlugin{
-        session_id u8;
+        car_id u8;
         msg WideString;
     }
     ConnectionClosedPlugin{
         name WideString;
         guid WideString;
-        session_id u8;
+        car_id u8;
         car_model String;
         car_skin String;
     }
@@ -430,16 +494,20 @@ packet_enum!(HandShake{
 packet_enum!(TestServer {
     0xe = MandatoryPit,
     0x0d = P2PCount,
+    0xf8 = Unknown4, //udp
     0xf9 = Ping,
     0x4a = UpdateSession,
     0x3e = NewCarConnection,
     0x3a = ClientFirstUpdateUdp,
     0x3b = Banned,
     0x3c = WrongPassword,
-    //0x3c = UdpError WideString,
+    0xc8 = LobbyCheckMessage, //udp
+    0x3c = UdpError,
+    //0x48 = MegaPacket,
     0x4a = Session,
     0x4d = ClientDisconnect,
     0x4b = RaceOver,
+    0x4e = UpdateUpdAddress,//udp
     0x5a = Unknown2,
     0x5b = Names,
     0x6f = Unknown3,
@@ -467,13 +535,25 @@ packet_enum!(TestServer {
     0x70 = Bops,
     0x78 = Weather,
     0x8c = PingCache,
+    0x82 = PingCache2,
 });
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::io::Cursor;
+    #[test]
+    fn update_session_test() {
+        let buffer: Vec<u8> = vec![
+            7, 81, 117, 97, 108, 105, 102, 121, 1, 2, 10, 0, 0, 0, 0, 0, 128, 63, 0, 1, 2, 3, 4,
+            146, 205, 0, 0, 0, 0, 0, 0,
+        ];
 
+        let mut cursor = Cursor::new(&buffer[..]);
+        let p = UpdateSession::read(&mut cursor).unwrap();
+        println!("{:?}", p);
+        assert_eq!(cursor.position() as usize, buffer.len());
+    }
     #[test]
     fn lap_completed_test() {
         let buffer: Vec<u8> = vec![
