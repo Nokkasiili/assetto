@@ -54,7 +54,7 @@ impl Codec {
                 cursor = Cursor::new(
                     &self.received_buf[length_field_length..length_field_length + length as usize],
                 );
-                println!("{:?}", cursor);
+                log::trace!("{:?}", cursor);
 
                 let packet = T::read(&mut cursor)?;
 

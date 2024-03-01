@@ -1,7 +1,6 @@
 sun_angle = 48.0
 track = "acu_bathurst"
 time_of_day_multiplier = 1.0
-#cars=["ks_alfa_romeo_155_v6", "bmw_m3_e30_dtm", "bmw_m3_e30_gra", "ks_mercedes_190_evo2"]
 
 [server]
 name = "Test Assetto Server"
@@ -11,6 +10,7 @@ udp_port = 9600
 http_port = 8080
 max_clients = 10
 client_send_interval_hz = 20
+welcome_message = "Assetto Corsa Server in Rust by Nokkasiili"
 
 [game]
 legal_tyres = "idk"
@@ -26,6 +26,12 @@ fuel_rate = 1.0
 start_rule = 0
 damage_multiplier = 1.0
 max_contacts_per_km = 5
+vote_duration = 10000
+has_extra_lap = false
+pit_window_start = 0
+pit_window_end = 0
+race_gas_penalty_disabled=false
+
 
 [dynamictrack]
 enabled = true
@@ -40,7 +46,7 @@ session_transfer = 0.1
   base_ambient=21
   base_road=30
   variation_ambient=1
-  variation_road=1
+  variation_road=12
   [weathers.wind]
   base_speed_min=1
   base_speed_max=4

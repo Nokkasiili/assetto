@@ -1,8 +1,7 @@
 use anyhow::{bail, Context};
-use log::LevelFilter;
-use protocol::packets::server::OnOffFactoryOption;
+
 use serde::{Deserialize, Deserializer};
-use std::{fs, net::Ipv4Addr, path::Path, str::FromStr};
+use std::{fs, net::Ipv4Addr, path::Path, str::FromStr, time::Duration};
 
 #[derive(Deserialize, Debug)]
 pub struct Wind {
@@ -32,8 +31,10 @@ pub struct Session {
 
 #[derive(Deserialize, Debug)]
 pub struct Sessions {
-    pub result_screen_time: u32,
-    pub race_over_time: u32,
+    #[serde(deserialize_with = "deserialize_duration")]
+    pub result_screen_time: Duration,
+    #[serde(deserialize_with = "deserialize_duration")]
+    pub race_over_time: Duration,
     pub sessions: Vec<Session>,
 }
 
@@ -72,6 +73,18 @@ pub struct GameOptions {
     pub damage_multiplier: f32,
     pub max_contacts_per_km: u8,
     pub allowed_tyres: i16,
+    #[serde(deserialize_with = "deserialize_duration")]
+    pub vote_duration: Duration,
+    pub has_extra_lap: bool,
+    pub pit_window_start: u16,
+    pub pit_window_end: u16,
+    pub race_gas_penalty_disabled: bool,
+}
+
+impl GameOptions {
+    pub fn pit_window_enabled(&self) -> bool {
+        self.pit_window_end != 0 && self.pit_window_start != 0
+    }
 }
 
 #[derive(Deserialize, Debug)]
@@ -82,6 +95,7 @@ pub struct ServerOptions {
     pub tcp_port: u16,
     pub http_port: u16,
     pub max_clients: u16,
+    pub welcome_message: String,
     pub client_send_interval_hz: u8,
 }
 
@@ -117,6 +131,14 @@ pub struct Config {
 const DEFAULT_CONFIG: &str = include_str!("../config.toml");
 
 /// Loads the config, creating a default config if needed.
+
+fn deserialize_duration<'de, D>(deserializer: D) -> Result<Duration, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let millis: u64 = Deserialize::deserialize(deserializer)?;
+    Ok(Duration::from_millis(millis))
+}
 
 fn deserialize_log_level<'de, D: Deserializer<'de>>(
     deserializer: D,
@@ -167,10 +189,15 @@ impl Config {
                 bail!("{}: Session time cannot be 0", i)
             }
         }
-        if config.sessions.result_screen_time < 10000 {
+        if config.game.pit_window_end <= config.game.pit_window_start
+            && config.game.pit_window_enabled()
+        {
+            bail!("pit_window_end cant be smaller than pit_window_start")
+        }
+        if config.sessions.result_screen_time.as_millis() < 10000 {
             bail!("result_screen_time cannot be lower than 10000")
         }
-        if config.sessions.race_over_time < 30000 {
+        if config.sessions.race_over_time.as_millis() < 30000 {
             bail!("race_over_time cannot be lower than 30000")
         }
         //if (main.ServerOptions.raceOverTime < 30000) {

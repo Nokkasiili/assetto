@@ -3,12 +3,13 @@ use crate::{
     dynamictrack::DynamicTrack,
     weather::{Temperature, Weather, Wind},
 };
-use protocol::packets::server::OnOffFactoryOption;
+
+use protocol::packets::server::Lap;
 use rand::seq::SliceRandom;
 use std::sync::RwLock;
-use std::{collections::HashMap, net::Ipv4Addr, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
-use md5::{Digest, Md5};
+use md5::Digest;
 //use crate::config::Weather;
 use std::fs;
 
@@ -20,6 +21,38 @@ pub struct ServerOptions {
     pub checksums: HashMap<String, String>,
     pub grip_level: DynamicTrack,
     pub sessions: Sessions,
+    pub laps: Laps,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct Laps {
+    laps: Vec<Lap>,
+}
+
+/*
+ struct main.Lap {
+    struct string DriverName;
+    struct string DriverGuid;
+    uint32 CarId;
+    struct string CarModel;
+    uint32 Timestamp;
+    uint32 LapTime;
+    struct []uint32 Sectors;
+    uint32 Cuts;
+    float32 BallastKG;
+    struct string Tyre;
+    float32 Restrictor;
+};
+ */
+
+impl Laps {
+    pub fn add_lap(&mut self, lap: Lap) {
+        self.laps.push(lap);
+    }
+
+    pub fn laps(&self) -> Vec<Lap> {
+        self.laps.clone()
+    }
 }
 
 pub struct Inner {}
@@ -49,6 +82,7 @@ impl ServerOptions {
             current_weather,
             grip_level: DynamicTrack::from(&conf.dynamictrack),
             sessions: Sessions::from(&conf.sessions.sessions),
+            laps: Laps::default(),
         }))
     }
     pub fn update_weather(&mut self) {
@@ -72,5 +106,9 @@ impl ServerOptions {
         CHECKSUM: content/tracks/acu_bathurst/data/surfaces.ini=7a95627e91bf7b3eba312333392ce3f2
         CHECKSUM: content/tracks/acu_bathurst/models.ini=b42cd49a8e3ab30797f9d6857ad4d2e6*/
         ret
+    }
+
+    pub fn current_weather(&self) -> &Weather {
+        &self.current_weather
     }
 }

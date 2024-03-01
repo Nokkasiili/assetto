@@ -36,12 +36,12 @@ pub struct Temperature {
     variation: f32,
 }
 
-impl From<Weather> for WeatherPacket {
-    fn from(weather: Weather) -> Self {
+impl From<&Weather> for WeatherPacket {
+    fn from(weather: &Weather) -> Self {
         Self {
             ambient: weather.ambient.temp as u8,
             road: weather.road.temp as u8,
-            name: weather.graphics,
+            name: weather.graphics.clone(),
             wind_speed: weather.wind.speed as i16,
             wind_direction: weather.wind.direction as i16,
         }
@@ -152,7 +152,6 @@ impl Wind {
 }
 #[cfg(test)]
 mod tests {
-    use super::SunAngle;
 
     /*    #[test]
     fn sun_angle_calc() {

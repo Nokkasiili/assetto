@@ -1,6 +1,7 @@
 use std::mem::size_of;
 
 use super::*;
+use crate::io::BigWideString;
 use crate::Readable;
 use crate::{io::Writeable, packets::common::Vec3f};
 use std::iter;
@@ -67,7 +68,7 @@ packets! {
     Bop{
         car_id u8;
         ballast f32;
-        unknown f32;
+        restrictor f32;
     }
     DRSZone{
         unknown f32;
@@ -91,10 +92,10 @@ packets! {
         car_id u8;
         name WideString;
     }
-    SessionBest{
+    Lap{
         //%d) %s BEST: %s TOTAL: %s Laps:%d SesID:%d HasFinished:%t
         car_id u8;
-        best_lap u32;
+        laptime u32;
       //  total_time u32;
         lap_count u16;
         has_completed_last_lap bool;
@@ -161,7 +162,7 @@ packets! {
     NoSlotsForCarModel{}
 
     Chat{
-        useless u8;
+        car_id u8;
         msg WideString;
     }
 
@@ -178,9 +179,9 @@ packets! {
     }
     LapCompleted{
         car_id u8;
-        unknown1 u32;
-        unknown2 u8;
-        session_bests BytePrefixedVec<SessionBest>;
+        laptime u32;
+        cuts u8;
+        laps BytePrefixedVec<Lap>;
         grip_level f32;
     }
     MandatoryPit{
@@ -204,8 +205,8 @@ packets! {
     }
 
     Ping {
-        unknown u32;
-        unknown1 u16;
+        last_ping_time u32;
+        ping u16;
     }
 
     Bops{
@@ -241,7 +242,7 @@ packets! {
         damage2 f32; //f sus
         damage3 f32; //steering
         damage4 f32; //r sus
-        damage5 f32; //chasis
+        //damage5 f32; //chasis
     }
     DRSZones{
         zones BytePrefixedVec<DRSZone>;
@@ -267,11 +268,11 @@ packets! {
     P2PCount{
         car_id u8;
         p2p_count i16;
-        unknown u8;
+        active bool;
     }
     WelcomeMessage{
         unknown u8;//always zero
-        welcome_msg WideString;// wrong
+        welcome_msg BigWideString;
     }
 
     CarConnected{
@@ -335,8 +336,8 @@ packets! {
 }
 #[derive(Debug, Clone)]
 pub struct RaceOver {
-    lap_data: Vec<RaceBest>,
-    unknown: bool, // true if session == race, race => over . resets stats?
+    pub lap_data: Vec<RaceBest>,
+    pub unknown: bool, // true if session == race, race => over . resets stats?
 }
 
 impl Writeable for RaceOver {
@@ -366,15 +367,15 @@ impl Readable for RaceOver {
 
 #[derive(Debug, Clone)]
 pub struct UpdateSession {
-    session_name: String,
-    session_index: u8,
-    session_type: SessionType,
-    session_time: u16,
-    session_laps: u16,
-    grip_level: f32,
+    pub session_name: String,
+    pub session_index: u8,
+    pub session_type: SessionType,
+    pub session_time: u16,
+    pub session_laps: u16,
+    pub grip_level: f32,
     //grid_position: u8,
-    grid_position: Vec<u8>,
-    time: i64,
+    pub grid_position: Vec<u8>,
+    pub time: i64,
 }
 impl Writeable for UpdateSession {
     fn write(&self, buffer: &mut Vec<u8>) -> Result<(), anyhow::Error> {
@@ -491,6 +492,32 @@ packets! {
         car_model String;
         car_skin String;
     }
+    MegaPacket{
+        timestamp u32;
+        ping u16;
+        position_updates BytePrefixedVec<PositionUpdate>;
+    }
+
+    PositionUpdate{
+        car_id u8;
+        pak_sequence_id u8;
+        timestamp u32;
+        pos Vec3f;
+        rotation Vec3f;
+        velocity Vec3f;
+        tyre_angular_speed u8;
+        tyre_angular_speed1 u8;
+        tyre_angular_speed2 u8;
+        tyre_angular_speed3 u8;
+
+        streer_angle u8;
+        wheel_angle u8;
+        engine_rpm u16;
+        gear u8;
+        status u32;
+ //       performance_delta i16;
+//        gas u8;
+    }
 }
 
 packet_enum!(UdpPlugin{
@@ -522,7 +549,7 @@ packet_enum!(TestServer {
     0x42 = WrongProtocol,
     0x45 = NoSlotsForCarModel,
     0x47 = Chat,
-    //0x48 = MegaPacket,
+    0x48 = MegaPacket,
     0x49 = LapCompleted,
     0x4a = UpdateSession,
     0x4b = RaceOver,
@@ -595,5 +622,29 @@ mod tests {
         println!("{:?}", p);
 
         assert_eq!(cursor.position() as usize, buffer.len());
+    }
+    #[test]
+    fn car_list_test() {
+        let buffer: Vec<u8> = vec![
+            0x00, 0x03, 0x00, 0x14, 0x6b, 0x73, 0x5f, 0x6d, 0x65, 0x72, 0x63, 0x65, 0x64, 0x65,
+            0x73, 0x5f, 0x31, 0x39, 0x30, 0x5f, 0x65, 0x76, 0x6f, 0x32, 0x06, 0x42, 0x6c, 0x75,
+            0x65, 0x37, 0x31, 0x0b, 0x4e, 0xc3, 0xb8, 0x6b, 0x6b, 0x61, 0x73, 0x69, 0x69, 0x6c,
+            0x69, 0x00, 0x03, 0x46, 0x49, 0x4e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+            0x14, 0x6b, 0x73, 0x5f, 0x6d, 0x65, 0x72, 0x63, 0x65, 0x64, 0x65, 0x73, 0x5f, 0x31,
+            0x39, 0x30, 0x5f, 0x65, 0x76, 0x6f, 0x32, 0x06, 0x42, 0x6c, 0x75, 0x65, 0x37, 0x31,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x14, 0x6b, 0x73,
+            0x5f, 0x6d, 0x65, 0x72, 0x63, 0x65, 0x64, 0x65, 0x73, 0x5f, 0x31, 0x39, 0x30, 0x5f,
+            0x65, 0x76, 0x6f, 0x32, 0x06, 0x42, 0x6c, 0x75, 0x65, 0x37, 0x31, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+        let mut cursor = Cursor::new(&buffer[..]);
+        let p = CarList::read(&mut cursor).unwrap();
+        let mut buffer1: Vec<u8> = Vec::new();
+        p.write(&mut buffer1).unwrap();
+        println!("{:?} {}", p, buffer.len());
+        assert_eq!(buffer, buffer1);
     }
 }

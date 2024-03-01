@@ -1,10 +1,10 @@
 use crate::{
-    car::{self, Cars, Driver},
+    car::{Cars, Driver},
     config::Config,
     option::ServerOptions,
     readwrite::{Reader, Writer},
     server::NewPlayer,
-    udpserver::UdpMessage,
+    udpserver::{UdpClientMessage, UdpServerMessage},
 };
 use anyhow::{bail, Context};
 use flume::{Receiver, Sender};
@@ -12,25 +12,17 @@ use futures_lite::FutureExt;
 use protocol::{
     io::{Readable, Writeable},
     packets::{
-        client::{CarlistRequest, JoinRequest, TestClient},
+        client::{JoinRequest, TestClient},
         common::PROTOCOL_VERSION,
-        server::{
-            Car, CarList, NewCarConnection, NoSlotsForCarModel, TestServer, WrongPassword,
-            WrongProtocol,
-        },
+        server::{NewCarConnection, NoSlotsForCarModel, TestServer, WrongPassword, WrongProtocol},
     },
-    Codec,
 };
-use serde::de;
+
 use std::{
-    any::Any,
-    borrow::Borrow,
-    f32::consts::E,
     fmt::Debug,
-    io::{self, ErrorKind},
     net::{IpAddr, SocketAddr},
     sync::{Arc, RwLock},
-    time::Duration,
+    time::Instant,
 };
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -38,36 +30,38 @@ use tokio::{
         tcp::{OwnedReadHalf, OwnedWriteHalf},
         TcpListener, TcpStream,
     },
-    time::timeout,
 };
 pub struct Listener {
+    start_time: Instant,
     listener: TcpListener,
     config: Arc<Config>,
     options: Arc<RwLock<ServerOptions>>,
     cars: Arc<Cars>,
     new_players: Sender<NewPlayer>,
-    udp_messages: Sender<UdpMessage>,
+    udp_packets_to_send: Sender<UdpServerMessage>,
 }
 
 impl Listener {
     pub async fn start(
+        start_time: Instant,
         config: Arc<Config>,
         options: Arc<RwLock<ServerOptions>>,
         cars: Arc<Cars>,
         new_players: Sender<NewPlayer>,
-        udp_messages: Sender<UdpMessage>,
+        udp_packets_to_send: Sender<UdpServerMessage>,
     ) -> anyhow::Result<()> {
         let address = format!("{}:{}", config.server.address, config.server.tcp_port);
         let listener = TcpListener::bind(&address)
             .await
             .context("failed to bind to port - maybe a server is already running?")?;
         let listener = Listener {
+            start_time,
             listener,
             config,
             options,
             cars,
             new_players,
-            udp_messages,
+            udp_packets_to_send,
         };
 
         tokio::spawn(async move {
@@ -91,7 +85,8 @@ impl Listener {
             self.options.clone(),
             self.cars.clone(),
             self.new_players.clone(),
-            self.udp_messages.clone(),
+            self.udp_packets_to_send.clone(),
+            self.start_time.clone(),
         );
         worker.start();
     }
@@ -107,7 +102,8 @@ pub struct Worker {
     new_players: Sender<NewPlayer>,
     ip: IpAddr,
     options: Arc<RwLock<ServerOptions>>,
-    udp_messages: Sender<UdpMessage>,
+    udp_packets_to_send: Sender<UdpServerMessage>,
+    start_time: Instant,
 }
 impl Worker {
     pub fn new(
@@ -117,7 +113,8 @@ impl Worker {
         options: Arc<RwLock<ServerOptions>>,
         cars: Arc<Cars>,
         new_players: Sender<NewPlayer>,
-        udp_messages: Sender<UdpMessage>,
+        udp_packets_to_send: Sender<UdpServerMessage>,
+        start_time: Instant,
     ) -> Self {
         let ip = stream.peer_addr().unwrap().ip();
         let (reader, writer) = stream.into_split();
@@ -137,13 +134,14 @@ impl Worker {
             cars,
             ip,
             new_players,
-            udp_messages,
+            udp_packets_to_send,
+            start_time,
         }
     }
 
-    pub fn start(mut self) {
+    pub fn start(self) {
         tokio::task::spawn(async move {
-            self.run().await;
+            let _ = self.run().await;
         });
     }
 
@@ -205,14 +203,14 @@ impl Worker {
                 tyre_wear_rate: self.config.game.tyre_wear_rate,
                 force_mirror: self.config.game.force_virtual_mirror,
                 max_contacts_per_km: self.config.game.max_contacts_per_km,
-                race_over_time: self.config.sessions.race_over_time,
-                result_screen_time: self.config.sessions.result_screen_time,
-                has_extra_lap: true,             //todo
-                race_gas_penalty_disabled: true, //todo
-                pit_window_start: 0,             //Todo
-                pit_window_end: 5,               //Todo
-                inverted_grid_positions: 4,      //todo
-                session_id: index as u8,         //todo
+                race_over_time: self.config.sessions.race_over_time.as_millis() as u32,
+                result_screen_time: self.config.sessions.result_screen_time.as_millis() as u32,
+                has_extra_lap: self.config.game.has_extra_lap,
+                race_gas_penalty_disabled: self.config.game.race_gas_penalty_disabled,
+                pit_window_start: self.config.game.pit_window_start,
+                pit_window_end: self.config.game.pit_window_end,
+                inverted_grid_positions: 4, //todo
+                session_id: index as u8,
                 sessions: options.sessions.clone().into(),
                 session_name: options.sessions.get_current_session().name.clone(),
                 session_index: options.sessions.get_current() as u8,
@@ -220,10 +218,10 @@ impl Worker {
                 session_time: options.sessions.get_current_session().end.as_secs() as u16,
                 session_laps: options.sessions.get_current_session().laps,
                 grip_level: options.grip_level.grip(),
-                player_position: 0,    //TODO
-                session_start_time: 0, //TODO,
-                checksum_files: options.checksums.keys().cloned().collect(),
-                legal_tyres: "TODO".to_owned(),
+                player_position: 0,     //TODO
+                session_start_time: 0,  //TOdo
+                checksum_files: vec![], //options.checksums.keys().cloned().collect(),
+                legal_tyres: self.config.game.legal_tyres.clone(),
                 random_seed: 1337,
                 server_time: 90,
             }))
@@ -246,11 +244,11 @@ impl Worker {
                     let new_player = NewPlayer {
                         received_packets: self.received_packets(),
                         packets_to_send: self.packets_to_send(),
-                        upd_messages: self.udp_messages(),
                         car_id: id,
                         ip: self.ip,
                         booked_as_admin: admin,
                         guid,
+                        udp_packets_to_send: self.udp_packets_to_send(),
                     };
                     let _ = self.new_players.send_async(new_player).await;
                     self.split(id);
@@ -298,7 +296,7 @@ impl Worker {
         self.received_packets_rx.clone()
     }
 
-    pub fn udp_messages(&self) -> Sender<UdpMessage> {
-        self.udp_messages.clone()
+    pub fn udp_packets_to_send(&self) -> Sender<UdpServerMessage> {
+        self.udp_packets_to_send.clone()
     }
 }

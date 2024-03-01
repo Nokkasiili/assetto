@@ -8,13 +8,10 @@ use protocol::{
 use std::fmt::Debug;
 use std::io::{self, ErrorKind};
 use std::time::Duration;
-use tokio::net::UdpSocket;
+
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
-    net::{
-        tcp::{OwnedReadHalf, OwnedWriteHalf},
-        TcpListener, TcpStream,
-    },
+    net::tcp::{OwnedReadHalf, OwnedWriteHalf},
     time::timeout,
 };
 
@@ -75,9 +72,8 @@ where
 
     pub async fn run(mut self) -> anyhow::Result<()> {
         loop {
-            log::debug!("reading packet");
-
             let packet = self.read().await?;
+            log::debug!("Read: {:?}", packet);
 
             let result = self.received_packets.send_async(packet).await;
             if result.is_err() {

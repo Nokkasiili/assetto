@@ -1,5 +1,4 @@
-use std::cell::Cell;
-use std::ops::Sub;
+use std::convert::TryInto;
 use std::time::{Duration, Instant};
 
 use crate::config::Session as CfgSession;
@@ -28,6 +27,7 @@ pub struct Sessions {
     sessions: Vec<Session>,
     start: Instant,
     current: usize,
+    laps: usize,
 }
 
 impl Sessions {
@@ -53,6 +53,7 @@ impl Sessions {
 
     pub fn is_over(&self) -> bool {
         self.start.elapsed() >= self.get_current_session().end
+            || self.laps > self.get_current_session().laps.into()
     }
     pub fn left_time(&self) -> Duration {
         self.get_current_session()
@@ -66,6 +67,12 @@ impl Sessions {
     }
     pub fn get_start(&self) -> Instant {
         self.start
+    }
+    pub fn add_lap(&mut self) {
+        self.laps = self.laps + 1;
+    }
+    pub fn laps(&self) -> usize {
+        self.laps
     }
 
     pub fn next_session(&mut self) {
@@ -99,6 +106,7 @@ impl From<&Vec<CfgSession>> for Sessions {
             sessions,
             start: Instant::now(),
             current: 0,
+            laps: 0,
         }
     }
 }

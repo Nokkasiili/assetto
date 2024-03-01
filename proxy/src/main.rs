@@ -1,3 +1,5 @@
+use std::net::{SocketAddr, TcpListener, TcpStream};
+
 use anyhow::{bail, Context};
 use argh::FromArgs;
 use async_executor::Executor;
@@ -11,7 +13,6 @@ use protocol::ClientPacketCodec;
 use protocol::ProtocolState;
 use protocol::ServerPacketCodec;
 use simple_logger::SimpleLogger;
-use std::net::{SocketAddr, TcpListener, TcpStream, UdpSocket};
 
 /// A proxy for debugging and inspecting the assetto protocol.
 #[derive(Debug, FromArgs)]
@@ -19,18 +20,10 @@ struct Args {
     /// the port to listen on. Must be different from
     /// the vanilla server's port.
     #[argh(option, short = 'p')]
-    tcp_port: u16,
+    port: u16,
     /// the port of the server to proxy to.
     #[argh(option, short = 's')]
-    server_tcp_port: u16,
-
-    /// the port to listen on. Must be different from
-    /// the vanilla server's port.
-    #[argh(option, short = 'u')]
-    udp_port: u16,
-    /// the port of the server to proxy to.
-    #[argh(option, short = 'v')]
-    server_udp_port: u16,
+    server_port: u16,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -41,67 +34,22 @@ fn main() -> anyhow::Result<()> {
         .unwrap();
     let args: Args = argh::from_env();
 
-    let tcp_addr = format!("127.0.0.1:{}", args.tcp_port);
-    let udp_addr = format!("127.0.0.1:{}", args.udp_port);
+    let addr = format!("127.0.0.1:{}", args.port);
+    let listener = TcpListener::bind(&addr)
+        .with_context(|| format!("failed to bind to port {}", args.port))?;
+    let mut listener = Async::new(listener)?;
 
-    let tcp_listener = TcpListener::bind(&tcp_addr)
-        .with_context(|| format!("failed to bind to port {}", args.tcp_port))?;
-    let mut tcp_listener = Async::new(tcp_listener)?;
-
-    let udp_socket = UdpSocket::bind(&udp_addr)
-        .with_context(|| format!("failed to bind to UDP port {}", args.udp_port))?;
-    let mut udp_socket = Async::new(udp_socket)?;
-
-    log::info!("Listening on {}", tcp_addr);
+    log::info!("Listening on {}", addr);
 
     let executor = Executor::new();
-    let tcp_task = accept_tcp_connections(&executor, &mut tcp_listener, args.tcp_port);
     block_on(executor.run(async {
-        select! {
-            _ = tcp_task.fuse() => (),
-            //_ = udp_task.fuse() => (),
-        }
+        accept_connections(&executor, &mut listener, args.server_port).await;
     }));
 
     Ok(())
 }
-/*
-fn main() -> anyhow::Result<()> {
-    SimpleLogger::new()
-        .with_level(log::LevelFilter::Debug)
-        .init()
-        .unwrap();
-    let args: Args = argh::from_env();
 
-    let tcp_addr = format!("127.0.0.1:{}", args.port);
-    let udp_addr = format!("127.0.0.1:{}", args.udp_port);
-
-    let tcp_listener = TcpListener::bind(&tcp_addr)
-        .with_context(|| format!("failed to bind to TCP port {}", args.port))?;
-    let mut tcp_listener = Async::new(tcp_listener)?;
-
-    let udp_socket = UdpSocket::bind(&udp_addr)
-        .with_context(|| format!("failed to bind to UDP port {}", args.udp_port))?;
-    let mut udp_socket = Async::new(udp_socket)?;
-
-    info!("Listening for TCP connections on {}", tcp_addr);
-    info!("Listening for UDP packets on {}", udp_addr);
-
-    let executor = Executor::new();
-    let tcp_task = accept_tcp_connections(&mut tcp_listener, args.server_port);
-    let udp_task = accept_udp_connections(&mut udp_socket, args.server_port);
-
-    block_on(executor.run(async {
-        futures::select! {
-            _ = tcp_task.fuse() => (),
-            _ = udp_task.fuse() => (),
-        }
-    }));
-
-    Ok(())
-}*/
-
-async fn accept_tcp_connections(
+async fn accept_connections(
     executor: &Executor<'static>,
     listener: &mut Async<TcpListener>,
     server_port: u16,

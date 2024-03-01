@@ -179,7 +179,7 @@ macro_rules! def_enum {
             ),* $(,)?
         }
     ) => {
-        #[derive(Debug, Clone)]
+        #[derive(Debug, Clone, PartialEq)]
         pub enum $ident {
             $(
                 $variant

@@ -2,16 +2,14 @@ use std::sync::{Arc, RwLock};
 
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, Server, StatusCode};
-use protocol::json::{Car, Info, JSON};
-use serde::de::IntoDeserializer;
-use std::net::{SocketAddr, ToSocketAddrs};
+use protocol::json::{Info, JSON};
 
 use crate::option::ServerOptions;
 use crate::{car::Cars, config::Config};
 
 pub struct HttpServer {
-    config: Arc<Config>,
-    cars: Arc<Cars>,
+    //config: Arc<Config>,
+    //cars: Arc<Cars>,
 }
 
 impl HttpServer {
@@ -60,13 +58,17 @@ impl HttpServer {
             // Serve some instructions at /
             (&Method::GET, "/") => Ok(Response::new(Body::from(""))),
 
-            (&Method::GET, "/INFO") => Ok(Response::new(Body::from(HttpServer::info(
-                config.clone(),
-                options.clone(),
-                cars.clone(),
-            )))),
+            (&Method::GET, "/INFO") => {
+                log::debug!("/INFO");
+                Ok(Response::new(Body::from(HttpServer::info(
+                    config.clone(),
+                    options.clone(),
+                    cars.clone(),
+                ))))
+            }
 
             (&Method::GET, "/JSON") => {
+                log::debug!("/JSON");
                 Ok(Response::new(Body::from(HttpServer::jsons(cars.clone()))))
             }
             _ => {
@@ -106,7 +108,7 @@ impl HttpServer {
                 .as_secs()
                 .into(),
             country: vec!["TODO".to_string()],
-            pass: true,
+            pass: config.game.password.is_some(),
             timestamp: 0,
             json: serde_json::Value::Null,
             l: false,

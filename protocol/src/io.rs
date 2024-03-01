@@ -166,6 +166,28 @@ impl Readable for String {
     }
 }
 
+impl<const N: usize, T: Writeable> Writeable for [T; N] {
+    fn write(&self, buffer: &mut Vec<u8>) -> anyhow::Result<()> {
+        for i in self.iter() {
+            i.write(buffer)?;
+        }
+        Ok(())
+    }
+}
+impl<const N: usize, T: Readable + Copy + Default> Readable for [T; N] {
+    fn read(buffer: &mut Cursor<&[u8]>) -> anyhow::Result<Self>
+    where
+        Self: Sized,
+    {
+        let mut array = [Default::default(); N];
+
+        for i in array.iter_mut() {
+            *i = T::read(buffer)?;
+        }
+
+        Ok(array)
+    }
+}
 impl Writeable for String {
     fn write(&self, buffer: &mut Vec<u8>) -> anyhow::Result<()> {
         (self.len() as u8).write(buffer)?;
@@ -225,6 +247,62 @@ impl From<Digest> for MD5Array {
     }
 }
 
+fn read_string(buffer: &mut Cursor<&[u8]>, length: usize) -> anyhow::Result<String> {
+    let mut string = String::new();
+    for _ in 0..length {
+        let mut temp = [0u8; 4];
+        buffer.read_exact(&mut temp)?;
+        if let Some(c) = char::from_u32(u32::from_le_bytes(temp)) {
+            string.push(c);
+        } else {
+            bail!("could convert");
+        }
+    }
+    Ok(string)
+}
+
+#[derive(Debug, Clone)]
+pub struct BigWideString(pub String);
+impl Readable for BigWideString {
+    fn read(buffer: &mut Cursor<&[u8]>) -> anyhow::Result<Self>
+    where
+        Self: Sized,
+    {
+        let length: usize = u16::read(buffer)
+            .context("failed to read string length")?
+            .into();
+        let string = read_string(buffer, length)?;
+
+        Ok(BigWideString(string))
+    }
+}
+
+impl Writeable for BigWideString {
+    fn write(&self, buffer: &mut Vec<u8>) -> anyhow::Result<()> {
+        (self.0.chars().count() as u16).write(buffer)?;
+        for i in self.0.chars() {
+            buffer.extend_from_slice(&u32::from(i).to_le_bytes())
+        }
+
+        Ok(())
+    }
+}
+impl From<BigWideString> for String {
+    fn from(x: BigWideString) -> Self {
+        x.0
+    }
+}
+impl From<String> for BigWideString {
+    fn from(x: String) -> Self {
+        Self(x)
+    }
+}
+
+impl From<&String> for BigWideString {
+    fn from(x: &String) -> Self {
+        Self(x.clone())
+    }
+}
 pub struct WideString(pub String);
 impl Readable for WideString {
     fn read(buffer: &mut Cursor<&[u8]>) -> anyhow::Result<Self>
@@ -234,18 +312,8 @@ impl Readable for WideString {
         let length: usize = u8::read(buffer)
             .context("failed to read string length")?
             .into();
-        //let real_length = 4 * length;
-        let mut string = String::new();
-        for _ in 0..length {
-            let mut temp = [0u8; 4];
-            buffer.read_exact(&mut temp)?;
-            if let Some(c) = char::from_u32(u32::from_le_bytes(temp)) {
-                string.push(c);
-            } else {
-                bail!("could convert");
-            }
-        }
-        //buffer.read_u8()?;
+        let string = read_string(buffer, length)?;
+
         Ok(WideString(string))
     }
 }
@@ -256,7 +324,6 @@ impl Writeable for WideString {
         for i in self.0.chars() {
             buffer.extend_from_slice(&u32::from(i).to_le_bytes())
         }
-        // buffer.extend_from_slice(&[0x00]);
 
         Ok(())
     }

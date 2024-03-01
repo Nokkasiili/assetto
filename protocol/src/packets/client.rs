@@ -1,5 +1,9 @@
 use super::*;
-use crate::{io::Readable, io::Writeable, packets::common::Vec3f};
+use crate::{
+    io::{Readable, Writeable},
+    packets::common::Vec3f,
+    SessionType,
+};
 
 def_enum! {
     CollisionType (u8) {
@@ -55,15 +59,15 @@ packets! {
         tire_compound String;
     }
     Pong{
-        unknown u32;
-        unknown2 u32;
+        ping u32;
+        time_offset u32;
     }
     Pulse{}
     Ping{
         unknown u32;
         unknown2 u16;
     }
-    Unknown{
+    MandatoryPit{
         unknown u8;
     }
     SectorSplit{
@@ -83,7 +87,8 @@ packets! {
         unknown2 u8;
     }
     CarUpdate{
-        unknown u8;
+       // car_id u8;
+        pak_sequence_id u8;
         timestamp u32;
         pos Vec3f;
         rotation Vec3f;
@@ -93,7 +98,7 @@ packets! {
         tyre_angular_speed2 u8;
         tyre_angular_speed3 u8;
 
-        streer_angle u8;
+        steer_angle u8;
         wheel_angle u8;
         engine_rpm u16;
         gear u8;
@@ -101,12 +106,9 @@ packets! {
         performance_delta i16;
         gas u8;
         normalized_pos f32;
-
-
-
     }
     SessionRequest{
-        unknown u8;
+        session_type SessionType;
     }
     /*Checksum{
         checksums BytePrefixedVec<MD5Array>;
@@ -121,17 +123,17 @@ packets! {
     //    damage5 f32; //chasis
     }
     P2PCount {
-        count u16;
-        unknown2 i8;
+        count i16;
+        active bool;
     }
 
     LapCompleted{
-        unknown u32;
-        unknown1 u32;
+        timestamp u32;
+        laptime u32;
         //unknown u8;
-        unknown2 BytePrefixedVec<u32>;
-        unknown3 u8;
-        unknown4 u8;
+        splits BytePrefixedVec<u32>;
+        cuts u8;
+        numlap u8;
     }
     Chat{
         unknown u8;
@@ -151,7 +153,7 @@ packets! {
 }
 #[derive(Debug, Clone)]
 pub struct Checksum {
-    checksums: Vec<MD5Array>,
+    pub checksums: Vec<MD5Array>,
 }
 
 impl Writeable for Checksum {
@@ -266,7 +268,7 @@ packet_enum!(HandShakeStatus{
 
 packet_enum!(TestClient {
     0x0d = P2PCount,
-    0xe = Unknown,
+    0xe = MandatoryPit,
     0x3d = JoinRequest,
     0x3f = CarlistRequest,
     0x43 = Disconnect,

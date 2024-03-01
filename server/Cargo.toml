@@ -21,5 +21,5 @@ futures-lite = "1.11"
 hyper = { version = "0.14", features = ["full"] }
 urlencoding = "1.1.1"
 env_logger = "0.10.1"
-sharded-slab = "0.1.1"
+#sharded-slab = "0.1.1"
 slab = "0.4.9"

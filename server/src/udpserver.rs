@@ -1,126 +1,109 @@
-use crate::car::Car;
-use crate::client::Client;
 use crate::config::Config;
 use crate::option::ServerOptions;
-use crate::server::Server;
+
 use crate::Cars;
-use crate::Clients;
+
 use anyhow::bail;
 use anyhow::Context;
 use anyhow::Result;
 use flume::Receiver;
 use flume::Sender;
-use protocol::io::Readable;
+use log::debug;
 use protocol::io::Writeable;
+
+use core::panic;
 use protocol::packets::client::TestClient;
 use protocol::packets::server::TestServer;
 use protocol::Codec;
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
+use std::time::Duration;
 use tokio::net::UdpSocket;
 pub struct UdpServer {
     /*     config: Arc<Config>,
     options: Arc<RwLock<ServerOptions>>,
     cars: Arc<Cars>,*/
-    udpmessage: Sender<UdpMessage>,
-    udpmessage_recv: Receiver<UdpMessage>,
+    received_packets_tx: Sender<UdpClientMessage>,
+    received_packets_rx: Receiver<UdpClientMessage>,
+    packets_to_send_tx: Sender<UdpServerMessage>,
+    packets_to_send_rx: Receiver<UdpServerMessage>,
     socket: UdpSocket,
 }
-pub enum PacketEnum {
-    Client(TestClient),
-    Server(TestServer),
+
+pub struct UdpClientMessage {
+    pub addr: SocketAddr,
+    pub packet: TestClient,
 }
-
-impl PacketEnum {
-    pub fn as_client(&self) -> Option<&TestClient> {
-        if let Self::Client(v) = self {
-            Some(v)
-        } else {
-            None
-        }
-    }
-
-    fn as_server(&self) -> Option<&TestServer> {
-        if let Self::Server(v) = self {
-            Some(v)
-        } else {
-            None
-        }
-    }
-
-    fn try_into_server(self) -> Result<TestServer> {
-        if let Self::Server(v) = self {
-            Ok(v)
-        } else {
-            bail!("Enum is not Server");
-        }
-    }
-}
-
-pub struct UdpMessage {
-    pub socket: SocketAddr,
-    pub packet: PacketEnum,
+pub struct UdpServerMessage {
+    pub addr: SocketAddr,
+    pub packet: TestServer,
 }
 
 impl UdpServer {
-    pub async fn bind(
-        udpmessage: Sender<UdpMessage>,
-        udpmessage_recv: Receiver<UdpMessage>,
-        cars: Arc<Cars>,
-        config: Arc<Config>,
-        options: Arc<RwLock<ServerOptions>>,
-    ) -> Result<()> {
+    pub async fn bind(config: Arc<Config>) -> Result<Self> {
+        let (received_packets_tx, received_packets_rx) = flume::bounded(32);
+        let (packets_to_send_tx, packets_to_send_rx) = flume::unbounded();
+
         let address = format!("{}:{}", config.server.address, config.server.udp_port);
         let socket = UdpSocket::bind(address)
             .await
             .context("failed to bind to udp port - maybe a server is already running?")?;
 
         let udpserver = UdpServer {
-            udpmessage,
-            udpmessage_recv,
+            received_packets_tx,
+            received_packets_rx,
+            packets_to_send_rx,
+            packets_to_send_tx,
             socket,
         };
-
-        tokio::task::spawn(async move {
-            udpserver.listen().await;
-            udpserver.send_udp().await;
-        });
 
         log::info!(
             "Server is listening udp on {}:{}",
             config.server.address,
             config.server.udp_port
         );
-        Ok(())
+        Ok(udpserver)
     }
+    /*
+    pub async fn run(self) {
+        tokio::task::spawn(async move {
+            loop {
+                let _ = self.listen().await;
+                let _ = self.send_udp().await;
+            }
+        });
+    }*/
 
-    pub async fn send_udp(&self) -> Result<()> {
-        let mut codec = Codec::new();
-
-        loop {
-            for i in self.udpmessage_recv.try_iter() {
-                let mut buffer = Vec::new();
-                codec.encode(&i.packet.try_into_server()?, &mut buffer);
-                self.socket.send_to(&buffer, i.socket).await?;
+    //UDP packets dont have len before packet
+    pub fn send_udp(&self) {
+        for i in self.packets_to_send_rx.try_iter() {
+            let mut buffer = Vec::new();
+            if i.packet.write(&mut buffer).is_ok() {
+                log::debug!("sent: {:?}", i.packet);
+                let _ = self.socket.try_send_to(&buffer, i.addr);
             }
         }
     }
 
-    pub async fn listen(&self) -> Result<()> {
-        let mut buf = [0; 512];
+    pub fn listen(&self) {
+        let mut buf = vec![0; 512];
         let mut codec = Codec::new();
-        loop {
-            let (len, addr) = self.socket.recv_from(&mut buf).await?;
-            codec.accept(&buf);
-            if let Some(packet) = codec.next_packet::<TestClient>()? {
-                self.udpmessage
-                    .send_async(UdpMessage {
-                        socket: addr,
-                        packet: PacketEnum::Client(packet),
-                    })
-                    .await?;
+        if let Ok((len, addr)) = self.socket.try_recv_from(&mut buf) {
+            if let Ok(Some(packet)) = codec.decode::<TestClient>(&mut buf[..len].to_vec()) {
+                log::trace!("{:?}", packet);
+                let _ = self
+                    .received_packets_tx
+                    .try_send(UdpClientMessage { addr, packet });
+            } else {
+                log::error!("Failed to decode:{:?}", buf);
             }
-            codec.clear();
         }
+    }
+    pub fn received_packets(&self) -> Receiver<UdpClientMessage> {
+        self.received_packets_rx.clone()
+    }
+
+    pub fn packets_to_send(&self) -> Sender<UdpServerMessage> {
+        self.packets_to_send_tx.clone()
     }
 }
