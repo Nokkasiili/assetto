@@ -18,6 +18,9 @@ impl Codec {
     pub fn accept(&mut self, bytes: &[u8]) {
         self.received_buf.extend(bytes);
     }
+    pub fn clear(&mut self) {
+        self.received_buf.clear();
+    }
 
     pub fn encode(&mut self, packet: &impl Writeable, output: &mut Vec<u8>) -> anyhow::Result<()> {
         packet.write(&mut self.staging_buf)?;
@@ -58,7 +61,6 @@ impl Codec {
                 let bytes_read = cursor.position() as usize + length_field_length;
                 self.received_buf = self.received_buf.split_off(bytes_read);
                 //self.received_buf.clear();
-
                 Some(packet)
             } else {
                 None

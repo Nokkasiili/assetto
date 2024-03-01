@@ -5,3 +5,5 @@ packets!(
         z f32;
     }
 );
+
+pub const PROTOCOL_VERSION: u16 = 202;

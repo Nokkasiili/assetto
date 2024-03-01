@@ -4,16 +4,28 @@ use super::*;
 use crate::Readable;
 use crate::{io::Writeable, packets::common::Vec3f};
 use std::iter;
+use std::option::Option;
 
 def_enum! {
-    OnOffFactoryOption (i8) {
+    OnOffFactoryOption (u8) {
         0 = Denied,
         1 = Factory,
         2 = Forced,
     }
 }
+
+impl From<u8> for OnOffFactoryOption {
+    fn from(x: u8) -> Self {
+        match x {
+            0 => OnOffFactoryOption::Denied,
+            2 => OnOffFactoryOption::Forced,
+            _ => OnOffFactoryOption::Factory,
+        }
+    }
+}
+
 def_enum! {
-    KickReason (i8) {
+    KickReason (u8) {
         0 = Kick,
         1 = KickBan,
         2 = KickBan2,
@@ -22,7 +34,7 @@ def_enum! {
 }
 
 def_enum! {
-    SessionType (i8) {
+    SessionType (u8) {
         0 = Booking,
         1 = Practice,
         2 = Qualify,
@@ -30,10 +42,22 @@ def_enum! {
     }
 }
 
+impl From<u8> for SessionType {
+    fn from(x: u8) -> Self {
+        match x {
+            0 => SessionType::Booking,
+            1 => SessionType::Practice,
+            2 => SessionType::Qualify,
+            3 => SessionType::Race,
+            _ => SessionType::Practice,
+        }
+    }
+}
+
 packets! {
     SessionU{
-        unknown u8;
-        unknown2 u16;
+        session_type SessionType;
+        laps u16;
         time u16;
     }
     Setup{
@@ -93,14 +117,14 @@ packets! {
         track_config String;
         car_model String;
         car_skin String;
-        unknown2 f32;
+        sun_angle f32;
         allowed_tyres i16;
-
         tyre_blankets_allowed bool;
         tc_allowed OnOffFactoryOption;
         abs_allowed OnOffFactoryOption;
         stability_allowed bool;
         autoclutch_allowed bool;
+//START_RULE=0         ; 0 is car locked until start;   1 is teleport   ; 2 is drivethru (if race has 3 or less laps then the Teleport penalty is enabled)
         start_rule u8;
         damage_multiplier f32;
         fuel_rate f32;
@@ -114,6 +138,7 @@ packets! {
         race_gas_penalty_disabled bool;
         pit_window_start u16;
         pit_window_end u16;
+//0 = no additional race, 1toX = only those position will be reversed for the next race, -1 = all the position will be reversed (Retired players will be on the last positions)
         inverted_grid_positions i16;
 
         session_id u8;
@@ -123,16 +148,15 @@ packets! {
         session_type SessionType;
         session_time u16;
         session_laps u16;
+
         grip_level f32;
-
         player_position u8;
-
-        time i64;
+        session_start_time i64;
         checksum_files BytePrefixedVec<String>;
         legal_tyres String;
 
         random_seed u32;
-        unknown4 u32;
+        server_time u32;
         }
     NoSlotsForCarModel{}
 
@@ -170,9 +194,9 @@ packets! {
     }
 
     CarSetup{
-     unknown u8;
-     fixed bool;
-     setups BytePrefixedVec<Setup>;
+        unknown u8;
+        fixed bool;
+        setups BytePrefixedVec<Setup>;
     }
 
     SunAngle{
@@ -191,7 +215,7 @@ packets! {
     SessionClosed{}
 
     Unknown{
-     unknown WideString;
+        unknown WideString;
     }
 
     WrongPassword{
@@ -222,21 +246,14 @@ packets! {
     DRSZones{
         zones BytePrefixedVec<DRSZone>;
     }
+
     SectorSplit{
         car_id u8;
         unknown2 u8;
         unknown3 u32;
         unknown4 u8;
     }
-    Session {
-        session_name String;
-        session_index u8;
-        session_type SessionType;
-        session_time u16;
-        session_laps u16;
-        grip_level f32;
-        time u64;
-    }
+
     CarList{
         from_session_id u8;
         cars BytePrefixedVec<Car>;
@@ -257,10 +274,10 @@ packets! {
         welcome_msg WideString;// wrong
     }
 
-    Unknown2{
+    CarConnected{
         car_id u8;
-        unknown String;
-        unknown2 String;
+        name String;
+        nation String;
     }
     SessionTimeLeft{
         session_time_left u32;
@@ -371,7 +388,7 @@ impl Writeable for UpdateSession {
             i.write(buffer)?;
         }
 
-        self.session_time.write(buffer)?;
+        self.time.write(buffer)?;
 
         Ok(())
     }
@@ -478,12 +495,12 @@ packets! {
 
 packet_enum!(UdpPlugin{
     0x32 = SessionInfoPlugin,
-    0x3b = SessionInfoPlugin1,
     0x33 = NewCarConnectionPlugin,
     0x34 = ConnectionClosedPlugin,
     0x37 = EndSessionPlugin,
     0x38 = SendVersionPlugin,
     0x39 = ChatPlugin,
+    0x3b = SessionInfoPlugin1,
     0x82 = ClientEventPlugin,
 });
 
@@ -492,32 +509,25 @@ packet_enum!(HandShake{
 });
 
 packet_enum!(TestServer {
-    0xe = MandatoryPit,
     0x0d = P2PCount,
-    0xf8 = Unknown4, //udp
-    0xf9 = Ping,
-    0x4a = UpdateSession,
-    0x3e = NewCarConnection,
-    0x3a = ClientFirstUpdateUdp,
+    0xe = MandatoryPit,
+    //0x36 =
+    0x3a = ClientFirstUpdateUdp, //udp
     0x3b = Banned,
     0x3c = WrongPassword,
-    0xc8 = LobbyCheckMessage, //udp
     0x3c = UdpError,
-    //0x48 = MegaPacket,
-    0x4a = Session,
-    0x4d = ClientDisconnect,
-    0x4b = RaceOver,
-    0x4e = UpdateUpdAddress,//udp
-    0x5a = Unknown2,
-    0x5b = Names,
-    0x6f = Unknown3,
-    //0x36 =
+    0x3e = NewCarConnection,
     0x40 = CarList,
     0x41 = SessionTimeLeft,
     0x42 = WrongProtocol,
     0x45 = NoSlotsForCarModel,
     0x47 = Chat,
+    //0x48 = MegaPacket,
     0x49 = LapCompleted,
+    0x4a = UpdateSession,
+    0x4b = RaceOver,
+    0x4d = ClientDisconnect,
+    0x4e = UpdateUpdAddress,//udp
     0x50 = ChangeTireCompound,
     0x51 = WelcomeMessage,
     0x52 = CarSetup,
@@ -526,16 +536,22 @@ packet_enum!(TestServer {
     0x56 = DamageUpdate,
     0x57 = RaceStart,
     0x58 = SectorSplit,
+    0x5a = CarConnected,
+    0x5b = Names,
     0x64 = NextSessionVote,
     0x65 = RestartSessionVote,
     0x66 = KickVote,
     0x68 = Kick,
-    0x6f = Unknown,
     0x6e = SessionClosed,
+    0x6f = Unknown3,
+    0x6f = Unknown,
     0x70 = Bops,
     0x78 = Weather,
-    0x8c = PingCache,
     0x82 = PingCache2,
+    0x8c = PingCache,
+    0xc8 = LobbyCheckMessage, //udp
+    0xf8 = Unknown4, //udp
+    0xf9 = Ping,
 });
 
 #[cfg(test)]

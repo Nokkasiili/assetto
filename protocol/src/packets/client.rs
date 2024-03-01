@@ -147,6 +147,7 @@ packets! {
         car_id u8;
     }
 
+
 }
 #[derive(Debug, Clone)]
 pub struct Checksum {
@@ -246,16 +247,16 @@ packets! {
 }
 
 packet_enum!(UdpPlugin {
-    0xd1 = AdminCommandPlugin,
-    0xcf = NextSessionPlugin,
-    0xd0 = RestartSessionPlugin,
-    0xcd = SetSessionInfoPlugin,
-    0xce = KickPlugin,
-    0xcc = SessionInfoPlugin,
     0xc8 = SetRealTimePosPlugin,
     0xc9 = RequestCarInfoPlugin,
     0xca = ChatPlugin,
     0xcb = BroadcastPlugin,
+    0xcc = SessionInfoPlugin,
+    0xcd = SetSessionInfoPlugin,
+    0xce = KickPlugin,
+    0xcf = NextSessionPlugin,
+    0xd0 = RestartSessionPlugin,
+    0xd1 = AdminCommandPlugin,
 
 });
 
@@ -264,21 +265,18 @@ packet_enum!(HandShakeStatus{
 });
 
 packet_enum!(TestClient {
-    0xc8 = LobbyCheckMessage,
-    0xe = Unknown,
     0x0d = P2PCount,
-    0xf8 = Pong, //udp
-    0xf9 = Ping,
+    0xe = Unknown,
     0x3d = JoinRequest,
     0x3f = CarlistRequest,
     0x43 = Disconnect,
-    0x4e = UpdateUpdAddress, //udp
-    0x4f = SessionRequest,//udp
-    0x4c = Pulse,//udp
     0x44 = Checksum,
     0x46 = CarUpdate,
     0x47 = Chat,
     0x49 = LapCompleted,
+    0x4c = Pulse,//udp
+    0x4e = UpdateUpdAddress, //udp
+    0x4f = SessionRequest,//udp
     0x50 = ChangeTireCompound,
     0x56 = DamageUpdate,
     0x58 = SectorSplit,
@@ -286,6 +284,9 @@ packet_enum!(TestClient {
     0x65 = RestartSessionVote,
     0x66 = KickVote,
     0x82 = Event,
+    0xc8 = LobbyCheckMessage,
+    0xf8 = Pong, //udp
+    0xf9 = Ping,
 });
 
 #[cfg(test)]

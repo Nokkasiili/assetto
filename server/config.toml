@@ -1,11 +1,13 @@
 sun_angle = 48.0
-tracks = ["acu_bathurst"]
-cars=["ks_alfa_romeo_155_v6", "bmw_m3_e30_dtm", "bmw_m3_e30_gra", "ks_mercedes_190_evo2"]
+track = "acu_bathurst"
+time_of_day_multiplier = 1.0
+#cars=["ks_alfa_romeo_155_v6", "bmw_m3_e30_dtm", "bmw_m3_e30_gra", "ks_mercedes_190_evo2"]
 
 [server]
+name = "Test Assetto Server"
 address = "0.0.0.0"
-tcp_port = 9800
-udp_port = 9800
+tcp_port = 9600
+udp_port = 9600
 http_port = 8080
 max_clients = 10
 client_send_interval_hz = 20
@@ -18,6 +20,20 @@ abs_allowed =  0
 stability_allowed = false
 autoclutch_allowed = false
 tyre_blankets_allowed = true
+allowed_tyres = 2
+tyre_wear_rate = 1.0
+fuel_rate = 1.0
+start_rule = 0
+damage_multiplier = 1.0
+max_contacts_per_km = 5
+
+[dynamictrack]
+enabled = true
+base_grip = 1.0
+session_start_grip = 1.0
+grip_per_lap = 0.1
+random_grip = 0.1
+session_transfer = 0.1
 
 [[weathers]]
   graphics = "3_clear"
@@ -34,4 +50,25 @@ tyre_blankets_allowed = true
 [log]
 level = "debug"
 
+[[cars]]
+model="ks_mercedes_190_evo2"
+skin="Blue71"
 
+[[cars]]
+model="ks_mercedes_190_evo2"
+skin="Blue71"
+
+[[cars]]
+model="ks_mercedes_190_evo2"
+skin="Blue71"
+
+
+
+[sessions]
+result_screen_time = 10000
+race_over_time = 30000
+  [[sessions.sessions]]
+  name="Qualify"
+  session_type=1
+  time=20000
+  laps=30

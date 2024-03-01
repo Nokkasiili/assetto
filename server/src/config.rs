@@ -1,4 +1,6 @@
 use anyhow::{bail, Context};
+use log::LevelFilter;
+use protocol::packets::server::OnOffFactoryOption;
 use serde::{Deserialize, Deserializer};
 use std::{fs, net::Ipv4Addr, path::Path, str::FromStr};
 
@@ -18,15 +20,39 @@ pub struct Weather {
     pub variation_road: f32,
     pub wind: Wind,
 }
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct Session {
+    pub name: String,
+    pub session_type: u8,
+    pub time: u16,
+    pub laps: u16,
+    //   pub is_open: bool,
+}
+
 #[derive(Deserialize, Debug)]
-struct DynamicTrack {
+pub struct Sessions {
+    pub result_screen_time: u32,
+    pub race_over_time: u32,
+    pub sessions: Vec<Session>,
+}
+
+impl std::ops::Deref for Sessions {
+    type Target = Vec<Session>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.sessions
+    }
+}
+
+#[derive(Deserialize, Debug)]
+pub struct DynamicTrack {
     pub enabled: bool,
     pub base_grip: f32,
     pub session_start_grip: f32,
     pub grip_per_lap: f32,
     pub random_grip: f32,
     pub session_transfer: f32,
-    pub total_lap_count: u32,
 }
 
 #[derive(Deserialize, Debug)]
@@ -38,31 +64,49 @@ pub struct GameOptions {
     pub stability_allowed: bool,
     pub autoclutch_allowed: bool,
     pub tyre_blankets_allowed: bool,
+    pub tyre_wear_rate: f32,
+    pub fuel_rate: f32,
+    pub start_rule: u8,
+    pub password: Option<String>,
+    pub admin_password: Option<String>,
+    pub damage_multiplier: f32,
+    pub max_contacts_per_km: u8,
+    pub allowed_tyres: i16,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct ServerOptions {
+    pub name: String,
     pub address: Ipv4Addr,
     pub udp_port: u16,
     pub tcp_port: u16,
     pub http_port: u16,
     pub max_clients: u16,
-    pub client_send_interval_hz: u16,
+    pub client_send_interval_hz: u8,
 }
+
 #[derive(Debug, Deserialize)]
 pub struct Log {
     #[serde(deserialize_with = "deserialize_log_level")]
     pub level: log::LevelFilter,
+}
+#[derive(Debug, Deserialize)]
+pub struct Car {
+    pub model: String,
+    pub skin: String,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct Config {
     pub server: ServerOptions,
     pub game: GameOptions,
+    pub dynamictrack: DynamicTrack,
     pub weathers: Vec<Weather>,
+    pub sessions: Sessions,
     pub sun_angle: f32,
-    pub tracks: Vec<String>,
-    pub cars: Vec<String>,
+    pub time_of_day_multiplier: f32,
+    pub track: String,
+    pub cars: Vec<Car>,
     pub log: Log,
 }
 
@@ -87,6 +131,9 @@ fn deserialize_log_level<'de, D: Deserializer<'de>>(
 }
 
 impl Config {
+    pub fn get_track_config(&self) -> String {
+        "".into() //TODO
+    }
     pub fn load(path: &str) -> anyhow::Result<Config> {
         let path = Path::new(path);
         let default_config = DEFAULT_CONFIG;
@@ -115,6 +162,20 @@ impl Config {
             }
         }
 
+        for (i, s) in config.sessions.iter().enumerate() {
+            if s.time == 0 {
+                bail!("{}: Session time cannot be 0", i)
+            }
+        }
+        if config.sessions.result_screen_time < 10000 {
+            bail!("result_screen_time cannot be lower than 10000")
+        }
+        if config.sessions.race_over_time < 30000 {
+            bail!("race_over_time cannot be lower than 30000")
+        }
+        //if (main.ServerOptions.raceOverTime < 30000) {
+        //session with 0time
+        //race wait under 20000
         Ok(config)
     }
 }

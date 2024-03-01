@@ -6,8 +6,6 @@ pub use codec::Codec;
 use io::{Readable, Writeable};
 use packets::{client::*, server::*};
 
-const PROTOCOL_VERSION: usize = 202;
-
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ProtocolState {
     Handshake,

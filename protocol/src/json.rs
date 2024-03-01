@@ -41,7 +41,7 @@ pub struct Info {
     pub cars: Vec<String>,
     pub timeofday: u64,
     pub session: u16,
-    pub sessiontypes: Vec<i64>,
+    pub sessiontypes: Vec<u8>,
     pub durations: Vec<i64>,
     pub timeleft: u64,
     pub country: Vec<String>,

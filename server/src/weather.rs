@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use protocol::packets::server::SunAngle as SunAnglePacket;
 use protocol::packets::server::Weather as WeatherPacket;
 use rand::Rng;
@@ -24,6 +26,7 @@ pub struct SunAngle {
     pub sun_angle: f32,
     base_sun_angle: f32,
     time_of_day_mult: f32,
+    start: Instant,
 }
 
 #[derive(Debug, Clone)]
@@ -81,8 +84,12 @@ impl Temperature {
         let mut rng = rand::thread_rng();
         self.temp = rng.gen_range(
             self.base_temp - self.variation,
-            self.variation + self.variation,
+            self.base_temp + self.variation,
         );
+    }
+
+    pub fn get(&self) -> f32 {
+        self.temp
     }
 }
 
@@ -92,18 +99,24 @@ impl SunAngle {
             sun_angle: base_sun_angle,
             base_sun_angle,
             time_of_day_mult,
+            start: Instant::now(),
         }
     }
-    pub fn update(&mut self, from_start_as_secs: f32) {
+    pub fn calc(&self) -> f32 {
         /*
         *
         *   main.CurrentSunAngle =
               (float32)((float)main.ServerOptions.baseSunAngle +
                        ((float)(double)CONCAT44(in_stack_ffffff94,fVar17) / 1000.0) * 0.0044 *
                        (float)main.ServerOptions.TimeOfDayMult);*/
+
+        let from_start_as_secs = self.start.elapsed().as_secs() as f32; //TODO
         let sun_angle: f32 =
             self.base_sun_angle + from_start_as_secs * 0.044 * self.time_of_day_mult;
-        self.sun_angle = sun_angle.clamp(-80.0, 80.0);
+        sun_angle.clamp(-80.0, 80.0)
+    }
+    pub fn get(&self) -> f32 {
+        self.sun_angle
     }
 }
 
@@ -134,13 +147,19 @@ impl Wind {
             self.base_direction + self.variation_direction,
         );
 
-        self.direction = Wind::normalize_angle(direction);
+        self.direction = direction % 360;
     }
-    fn normalize_angle(a: i32) -> i32 {
-        let mut normalized = a % 360;
-        if normalized < 0 {
-            normalized += 360;
-        }
-        normalized
+}
+#[cfg(test)]
+mod tests {
+    use super::SunAngle;
+
+    /*    #[test]
+    fn sun_angle_calc() {
+        let sun_angle = SunAngle::new(-80.0, 1.0); //8:00
+        let calc_sun_angle = sun_angle.calc(10.0 * 60.0 * 60.0);
+
+        assert_eq!(calc_sun_angle, 80.0)
     }
+    */
 }
